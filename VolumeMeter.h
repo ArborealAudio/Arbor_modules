@@ -111,60 +111,81 @@ struct VolumeMeterComponent : Component, Timer
         Reduction
     };
 
-    void setMeterType(Type newType) { type = newType; }
-
-    VolumeMeterComponent(VolumeMeterSource& v) : source(v)
+    struct VolumeMeterLookAndFeel : LookAndFeel_V4
     {
+        VolumeMeterLookAndFeel(VolumeMeterComponent& comp, Type t) : owner(comp), type(t)
+        {}
+
+        void setMeterType(Type newType) {type = newType;}
+
+        void drawMeterBar(Graphics& g)
+        {
+            switch (type)
+            {
+            case Volume: {
+                g.setColour(Colours::white);
+
+                auto dbL = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -100.f);
+                auto dbR = Decibels::gainToDecibels(owner.source.getAvgRMS(1), -100.f);
+
+                auto bounds = Rectangle<float>{ceilf(owner.getX()) + 1.f, ceilf(owner.getY()) + 1.f,
+                                            floorf(owner.getRight()) - ceilf(owner.getX()) + 2.f,
+                                            floorf(owner.getBottom()) - ceilf(owner.getY()) + 2.f};
+
+                Rectangle<float> rectL = bounds.withTop(bounds.getY() + dbL * bounds.getHeight() / -100.f).removeFromLeft(bounds.getWidth() / 2.f + 5.f);
+                Rectangle<float> rectR = bounds.withTop(bounds.getY() + dbR * bounds.getHeight() / -100.f).removeFromRight(bounds.getWidth() / 2.f);
+
+                g.fillRect(rectL);
+                g.fillRect(rectR);
+                break;
+                }
+            case Reduction: {
+                g.setColour(Colours::white);
+
+                auto db = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -60.f);
+
+                auto bounds = Rectangle<float>{ceilf(owner.getX()) + 1.f, ceilf(owner.getY()) + 1.f,
+                                            floorf(owner.getRight()) - ceilf(owner.getX()) + 2.f,
+                                            floorf(owner.getBottom()) - ceilf(owner.getY()) + 2.f};
+
+                Rectangle<float> rect = bounds.withBottom(bounds.getY() - db * bounds.getHeight() / 60.f);
+
+                g.fillRect(rect.translated(0, 20));
+                // g.drawRoundedRectangle(owner.getLocalBounds().toFloat(), 3.f, 1.f);
+                if (db < 0.f) {
+                    g.drawFittedText("GR", Rectangle<int>(0, 0, owner.getWidth(), 20), Justification::centred, 1);
+                }
+                break;
+                }
+            }
+        }
+
+    private:
+        Type type;
+        VolumeMeterComponent& owner;
+    };
+
+    void setMeterType(Type newType) 
+    {
+        type = newType;
+        lnf.setMeterType(type);
+    }
+
+    VolumeMeterComponent(VolumeMeterSource& v) : source(v), lnf(*this, type)
+    {
+        setLookAndFeel(&lnf);
         startTimerHz(30);
     }
 
     ~VolumeMeterComponent() override
     {
+        setLookAndFeel(nullptr);
         stopTimer();
     }
 
     void paint(Graphics& g) override
     {
-        drawMeterBar(g);
-    }
-
-    void drawMeterBar(Graphics& g)
-    {
-        switch (type)
-        {
-        case Volume: {
-            g.setColour(Colours::white);
-
-            auto dbL = Decibels::gainToDecibels(source.getAvgRMS(0), -100.f);
-            auto dbR = Decibels::gainToDecibels(source.getAvgRMS(1), -100.f);
-
-            auto bounds = Rectangle<float>{ceilf(getX()) + 1.f, ceilf(getY()) + 1.f,
-                                        floorf(getRight()) - ceilf(getX()) + 2.f,
-                                        floorf(getBottom()) - ceilf(getY()) + 2.f};
-
-            Rectangle<float> rectL = bounds.withTop(bounds.getY() + dbL * bounds.getHeight() / -100.f).removeFromLeft(bounds.getWidth() / 2.f + 5.f);
-            Rectangle<float> rectR = bounds.withTop(bounds.getY() + dbR * bounds.getHeight() / -100.f).removeFromRight(bounds.getWidth() / 2.f);
-
-            g.fillRect(rectL);
-            g.fillRect(rectR);
-            break;
-            }
-        case Reduction: {
-            g.setColour(Colours::white);
-
-            auto db = Decibels::gainToDecibels(source.getAvgRMS(0), -60.f);
-
-            auto bounds = Rectangle<float>{ceilf(getX()) + 1.f, ceilf(getY()) + 1.f,
-                                        floorf(getRight()) - ceilf(getX()) + 2.f,
-                                        floorf(getBottom()) - ceilf(getY()) + 2.f};
-
-            Rectangle<float> rect = bounds.withBottom(bounds.getY() - db * bounds.getHeight() / 60.f);
-
-            // g.drawRect(bounds);
-            g.fillRect(rect);
-            break;
-            }
-        }
+        lnf.drawMeterBar(g);
     }
 
     void timerCallback() override
@@ -176,8 +197,9 @@ struct VolumeMeterComponent : Component, Timer
         }
     }
 
-private:
+protected:
     VolumeMeterSource& source;
-
+private:
     Type type;
+    VolumeMeterLookAndFeel lnf;
 };
