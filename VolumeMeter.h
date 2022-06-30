@@ -171,7 +171,7 @@ struct VolumeMeterComponent : Component, Timer
         lnf.setMeterType(type);
     }
 
-    VolumeMeterComponent(VolumeMeterSource& v) : source(v), lnf(*this, type)
+    VolumeMeterComponent(VolumeMeterSource& v) : lnf(*this, type), source(v)
     {
         setLookAndFeel(&lnf);
         startTimerHz(30);
