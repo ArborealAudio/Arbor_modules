@@ -84,19 +84,26 @@ namespace strix
 
         //==============================================================================
         /** Sets the delay in samples. */
-        void setDelay (SampleType newDelayInSamples)
+        void setDelay (double newDelayInSamples)
+        {
+            auto upperLimit = (double) getMaximumDelayInSamples();
+            jassert (isPositiveAndNotGreaterThan (newDelayInSamples, upperLimit));
+
+            delay     = jlimit ((double) 0, upperLimit, newDelayInSamples);
+            delayInt  = static_cast<int> (std::floor (xsimd::hadd(delay) / 2.0));
+            delayFrac = delay - (double) delayInt;
+
+            // updateInternalVariables();
+        }
+
+        void setDelay (xsimd::batch<double> newDelayInSamples)
         {
             auto upperLimit = (SampleType) getMaximumDelayInSamples();
             jassert (isPositiveAndNotGreaterThan (newDelayInSamples, upperLimit));
 
-            delay     = jlimit ((SampleType) 0, upperLimit, newDelayInSamples);
-            if constexpr (std::is_same_v<SampleType, double>)
-                delayInt  = static_cast<int> (std::floor (delay));
-            else
-                delayInt  = static_cast<int> (std::floor(xsimd::hadd(delay)));
+            delay = xsimd::max((SampleType)0.0, xsimd::min(newDelayInSamples, upperLimit));
+            delayInt = static_cast<int>(std::floor(xsimd::hadd(delay)));
             delayFrac = delay - (SampleType) delayInt;
-
-            // updateInternalVariables();
         }
 
         /** Returns the current delay in samples. */
@@ -193,16 +200,23 @@ namespace strix
 
             @see setDelay, pushSample, process
         */
-        SampleType popSample (int channel, SampleType delayInSamples = -1, bool updateReadPointer = true)
+        SampleType popSample (int channel, double delayInSamples = -1, bool updateReadPointer = true)
         {
-            if constexpr (std::is_same_v<SampleType, double>)
-                if (delayInSamples >= 0)
-                    setDelay(delayInSamples);
-            else {
-                xsimd::batch_bool<double> notZero {delayInSamples >= 0};
-                if (xsimd::any(notZero))
-                    setDelay(delayInSamples);
-            }
+            if (delayInSamples >= 0)
+                setDelay(delayInSamples);
+
+            auto result = interpolateSample (channel);
+
+            if (updateReadPointer)
+                readPos[(size_t) channel] = (readPos[(size_t) channel] + totalSize - 1) % totalSize;
+
+            return result;
+        }
+
+        xsimd::batch<double> popSample (int channel, xsimd::batch<double> delayInSamples = -1, bool updateReadPointer = true)
+        {
+            if (xsimd::any(delayInSamples >= 0))
+                setDelay(delayInSamples);
 
             auto result = interpolateSample (channel);
 
