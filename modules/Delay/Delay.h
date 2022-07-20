@@ -90,7 +90,7 @@ namespace strix
             jassert (isPositiveAndNotGreaterThan (newDelayInSamples, upperLimit));
 
             delay     = jlimit ((double) 0, upperLimit, newDelayInSamples);
-            delayInt  = static_cast<int> (std::floor (xsimd::hadd(delay) / 2.0));
+            delayInt  = static_cast<int> (std::floor (delay));
             delayFrac = delay - (double) delayInt;
 
             // updateInternalVariables();
@@ -107,10 +107,10 @@ namespace strix
         }
 
         /** Returns the current delay in samples. */
-        SampleType getDelay() const
-        {
-            return delay;
-        }
+        // SampleType getDelay() const
+        // {
+        //     return delay;
+        // }
 
         //==============================================================================
         /** Initialises the processor. */
@@ -286,7 +286,7 @@ namespace strix
         std::vector<std::vector<SampleType>> bufferData;
         std::vector<SampleType> v;
         std::vector<int> writePos, readPos;
-        SampleType delay = 0.0, delayFrac = 0.0;
+        double delay = 0.0, delayFrac = 0.0;
         int delayInt = 0, totalSize = 4;
         SampleType alpha = 0.0;
     };
