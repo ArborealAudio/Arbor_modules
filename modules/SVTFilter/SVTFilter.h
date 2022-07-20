@@ -47,7 +47,7 @@ namespace strix
             if constexpr (std::is_same_v<T, double>)
                 g = (double)(std::tan(MathConstants<double>::pi * cutoffFrequency / sampleRate));
             else
-                g = (T)(xsimd::tan(MathConstants<double>::pi * cutoffFrequency / sampleRate));
+                g = (T)(xsimd::tan((T)MathConstants<double>::pi * cutoffFrequency / (T)sampleRate));
 
             R2 = (T)(1.0 / resonance);
             h = (T)(1.0 / (1.0 + R2 * g + g * g));
