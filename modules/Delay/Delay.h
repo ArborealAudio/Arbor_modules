@@ -17,7 +17,7 @@ END_JUCE_MODULE_DECLARATION
 
 namespace strix
 {
-    using namespace juce;
+    // using namespace juce;
 
     namespace DelayLineInterpolationTypes
     {
@@ -62,27 +62,68 @@ namespace strix
         struct Thiran {};
     }
 
-    template <typename SampleType, typename InterpolationType = DelayLineInterpolationTypes::Linear>
-    class DelayLine
+    template <typename SampleType>
+    class Delay
     {
     public:
         //==============================================================================
         /** Default constructor. */
-        DelayLine();
+        Delay() : Delay(0)
+        {
+        }
 
         /** Constructor. */
-        explicit DelayLine (int maximumDelayInSamples);
+        explicit Delay (int maximumDelayInSamples)
+        {
+            jassert (maximumDelayInSamples >= 0);
+
+            sampleRate = 44100.0;
+
+            setMaximumDelayInSamples (maximumDelayInSamples);
+        }
 
         //==============================================================================
         /** Sets the delay in samples. */
-        void setDelay (SampleType newDelayInSamples);
+        void setDelay (SampleType newDelayInSamples)
+        {
+            auto upperLimit = (SampleType) getMaximumDelayInSamples();
+            jassert (isPositiveAndNotGreaterThan (newDelayInSamples, upperLimit));
+
+            delay     = jlimit ((SampleType) 0, upperLimit, newDelayInSamples);
+            if constexpr (std::is_same_v<SampleType, double>)
+                delayInt  = static_cast<int> (std::floor (delay));
+            else
+                delayInt  = static_cast<int> (std::floor(xsimd::hadd(delay)));
+            delayFrac = delay - (SampleType) delayInt;
+
+            // updateInternalVariables();
+        }
 
         /** Returns the current delay in samples. */
-        SampleType getDelay() const;
+        SampleType getDelay() const
+        {
+            return delay;
+        }
 
         //==============================================================================
         /** Initialises the processor. */
-        void prepare (const ProcessSpec& spec);
+        void prepare (const dsp::ProcessSpec& spec)
+        {
+            jassert (spec.numChannels > 0);
+
+            // bufferData.setSize ((int) spec.numChannels, totalSize, false, false, true);
+            bufferData.resize(spec.numChannels);
+            for (auto& buf : bufferData)
+                buf.resize(totalSize);
+
+            writePos.resize (spec.numChannels);
+            readPos.resize  (spec.numChannels);
+
+            v.resize (spec.numChannels);
+            sampleRate = spec.sampleRate;
+
+            reset();
+        }
 
         /** Sets a new maximum delay in samples.
 
@@ -90,7 +131,15 @@ namespace strix
 
             This may allocate internally, so you should never call it from the audio thread.
         */
-        void setMaximumDelayInSamples (int maxDelayInSamples);
+        void setMaximumDelayInSamples (int maxDelayInSamples)
+        {
+            jassert (maxDelayInSamples >= 0);
+            totalSize = jmax (4, maxDelayInSamples + 1);
+            // bufferData.setSize ((int) bufferData.getNumChannels(), totalSize, false, false, true);
+            for (auto& buf : bufferData)
+                buf.resize(totalSize);
+            reset();
+        }
 
         /** Gets the maximum possible delay in samples.
 
@@ -100,7 +149,16 @@ namespace strix
         int getMaximumDelayInSamples() const noexcept       { return totalSize - 1; }
 
         /** Resets the internal state variables of the processor. */
-        void reset();
+        void reset()
+        {
+            for (auto vec : { &writePos, &readPos })
+                std::fill (vec->begin(), vec->end(), 0);
+
+            std::fill (v.begin(), v.end(), static_cast<SampleType> (0));
+
+            for (auto& buf : bufferData)
+                buf.clear();
+        }
 
         //==============================================================================
         /** Pushes a single sample into one channel of the delay line.
@@ -111,7 +169,12 @@ namespace strix
 
             @see setDelay, popSample, process
         */
-        void pushSample (int channel, SampleType sample);
+        void pushSample (int channel, SampleType sample)
+        {
+            // bufferData.setSample (channel, writePos[(size_t) channel], sample);
+            bufferData[channel][writePos[channel]] = sample;
+            writePos[(size_t) channel] = (writePos[(size_t) channel] + totalSize - 1) % totalSize;
+        }
 
         /** Pops a single sample from one channel of the delay line.
 
@@ -130,7 +193,24 @@ namespace strix
 
             @see setDelay, pushSample, process
         */
-        SampleType popSample (int channel, SampleType delayInSamples = -1, bool updateReadPointer = true);
+        SampleType popSample (int channel, SampleType delayInSamples = -1, bool updateReadPointer = true)
+        {
+            if constexpr (std::is_same_v<SampleType, double>)
+                if (delayInSamples >= 0)
+                    setDelay(delayInSamples);
+            else {
+                xsimd::batch_bool<double> notZero {delayInSamples >= 0};
+                if (xsimd::any(notZero))
+                    setDelay(delayInSamples);
+            }
+
+            auto result = interpolateSample (channel);
+
+            if (updateReadPointer)
+                readPos[(size_t) channel] = (readPos[(size_t) channel] + totalSize - 1) % totalSize;
+
+            return result;
+        }
 
         //==============================================================================
         /** Processes the input and output samples supplied in the processing context.
@@ -140,50 +220,32 @@ namespace strix
 
             @see setDelay
         */
-        template <typename ProcessContext>
-        void process (const ProcessContext& context) noexcept
+        template <class Block>
+        void processBlock (Block& block) noexcept
         {
-            const auto& inputBlock = context.getInputBlock();
-            auto& outputBlock      = context.getOutputBlock();
-            const auto numChannels = outputBlock.getNumChannels();
-            const auto numSamples  = outputBlock.getNumSamples();
+            const auto numChannels = block.getNumChannels();
+            const auto numSamples  = block.getNumSamples();
 
-            jassert (inputBlock.getNumChannels() == numChannels);
-            jassert (inputBlock.getNumChannels() == writePos.size());
-            jassert (inputBlock.getNumSamples()  == numSamples);
-
-            if (context.isBypassed)
-            {
-                outputBlock.copyFrom (inputBlock);
-                return;
-            }
+            jassert (block.getNumChannels() == numChannels);
+            jassert (block.getNumChannels() == writePos.size());
+            jassert (block.getNumSamples()  == numSamples);
 
             for (size_t channel = 0; channel < numChannels; ++channel)
             {
-                auto* inputSamples = inputBlock.getChannelPointer (channel);
-                auto* outputSamples = outputBlock.getChannelPointer (channel);
+                auto* in = block.getChannelPointer (channel);
 
                 for (size_t i = 0; i < numSamples; ++i)
                 {
-                    pushSample ((int) channel, inputSamples[i]);
-                    outputSamples[i] = popSample ((int) channel);
+                    pushSample ((int) channel, in[i]);
+                    in[i] = popSample ((int) channel);
                 }
             }
         }
 
     private:
         //==============================================================================
-        template <typename T = InterpolationType>
-        typename std::enable_if <std::is_same <T, DelayLineInterpolationTypes::None>::value, SampleType>::type
-        interpolateSample (int channel) const
-        {
-            auto index = (readPos[(size_t) channel] + delayInt) % totalSize;
-            return bufferData.getSample (channel, index);
-        }
 
-        template <typename T = InterpolationType>
-        typename std::enable_if <std::is_same <T, DelayLineInterpolationTypes::Linear>::value, SampleType>::type
-        interpolateSample (int channel) const
+        SampleType interpolateSample (int channel) const
         {
             auto index1 = readPos[(size_t) channel] + delayInt;
             auto index2 = index1 + 1;
@@ -194,112 +256,20 @@ namespace strix
                 index2 %= totalSize;
             }
 
-            auto value1 = bufferData.getSample (channel, index1);
-            auto value2 = bufferData.getSample (channel, index2);
+            // auto value1 = bufferData.getSample (channel, index1);
+            // auto value2 = bufferData.getSample (channel, index2);
+            auto value1 = bufferData[channel][index1];
+            auto value2 = bufferData[channel][index2];
 
             return value1 + delayFrac * (value2 - value1);
-        }
-
-        template <typename T = InterpolationType>
-        typename std::enable_if <std::is_same <T, DelayLineInterpolationTypes::Lagrange3rd>::value, SampleType>::type
-        interpolateSample (int channel) const
-        {
-            auto index1 = readPos[(size_t) channel] + delayInt;
-            auto index2 = index1 + 1;
-            auto index3 = index2 + 1;
-            auto index4 = index3 + 1;
-
-            if (index4 >= totalSize)
-            {
-                index1 %= totalSize;
-                index2 %= totalSize;
-                index3 %= totalSize;
-                index4 %= totalSize;
-            }
-
-            auto* samples = bufferData.getReadPointer (channel);
-
-            auto value1 = samples[index1];
-            auto value2 = samples[index2];
-            auto value3 = samples[index3];
-            auto value4 = samples[index4];
-
-            auto d1 = delayFrac - 1.f;
-            auto d2 = delayFrac - 2.f;
-            auto d3 = delayFrac - 3.f;
-
-            auto c1 = -d1 * d2 * d3 / 6.f;
-            auto c2 = d2 * d3 * 0.5f;
-            auto c3 = -d1 * d3 * 0.5f;
-            auto c4 = d1 * d2 / 6.f;
-
-            return value1 * c1 + delayFrac * (value2 * c2 + value3 * c3 + value4 * c4);
-        }
-
-        template <typename T = InterpolationType>
-        typename std::enable_if <std::is_same <T, DelayLineInterpolationTypes::Thiran>::value, SampleType>::type
-        interpolateSample (int channel)
-        {
-            auto index1 = readPos[(size_t) channel] + delayInt;
-            auto index2 = index1 + 1;
-
-            if (index2 >= totalSize)
-            {
-                index1 %= totalSize;
-                index2 %= totalSize;
-            }
-
-            auto value1 = bufferData.getSample (channel, index1);
-            auto value2 = bufferData.getSample (channel, index2);
-
-            auto output = delayFrac == 0 ? value1 : value2 + alpha * (value1 - v[(size_t) channel]);
-            v[(size_t) channel] = output;
-
-            return output;
-        }
-
-        //==============================================================================
-        template <typename T = InterpolationType>
-        typename std::enable_if <std::is_same <T, DelayLineInterpolationTypes::None>::value, void>::type
-        updateInternalVariables()
-        {
-        }
-
-        template <typename T = InterpolationType>
-        typename std::enable_if <std::is_same <T, DelayLineInterpolationTypes::Linear>::value, void>::type
-        updateInternalVariables()
-        {
-        }
-
-        template <typename T = InterpolationType>
-        typename std::enable_if <std::is_same <T, DelayLineInterpolationTypes::Lagrange3rd>::value, void>::type
-        updateInternalVariables()
-        {
-            if (delayInt >= 1)
-            {
-                delayFrac++;
-                delayInt--;
-            }
-        }
-
-        template <typename T = InterpolationType>
-        typename std::enable_if <std::is_same <T, DelayLineInterpolationTypes::Thiran>::value, void>::type
-        updateInternalVariables()
-        {
-            if (delayFrac < (SampleType) 0.618 && delayInt >= 1)
-            {
-                delayFrac++;
-                delayInt--;
-            }
-
-            alpha = (1 - delayFrac) / (1 + delayFrac);
         }
 
         //==============================================================================
         double sampleRate;
 
         //==============================================================================
-        AudioBuffer<SampleType> bufferData;
+        // AudioBuffer<SampleType> bufferData;
+        std::vector<std::vector<SampleType>> bufferData;
         std::vector<SampleType> v;
         std::vector<int> writePos, readPos;
         SampleType delay = 0.0, delayFrac = 0.0;
