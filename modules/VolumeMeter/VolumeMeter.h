@@ -144,19 +144,22 @@ struct VolumeMeterComponent : Component, Timer
 
                 auto db = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -60.f);
 
-                auto bounds = Rectangle<float>{ceilf(owner.getX()) + 1.f, ceilf(owner.getY()) + 1.f,
-                                            floorf(owner.getRight()) - ceilf(owner.getX()) + 2.f,
-                                            floorf(owner.getBottom()) - ceilf(owner.getY()) + 2.f};
+                auto ob = owner.getLocalBounds();
+
+                auto bounds = Rectangle<float>{ceilf(ob.getX()) + 1.f, ceilf(ob.getY()) + 1.f,
+                                            floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f,
+                                            floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
 
                 Rectangle<float> rect = bounds.withBottom(bounds.getY() - db * bounds.getHeight() / 60.f);
 
                 g.fillRect(rect.translated(0, 20));
-                // g.drawRoundedRectangle(owner.getLocalBounds().toFloat(), 3.f, 1.f);
                 if (db < 0.f) {
-                    g.drawFittedText("GR", Rectangle<int>(0, 0, owner.getWidth(), 20), Justification::centred, 1);
+                    g.drawFittedText("GR", Rectangle<int>(0, 0, ob.getWidth(), 20), Justification::centred, 1);
                 }
                 break;
                 }
+            default:
+                return;
             }
         }
 
@@ -195,6 +198,10 @@ struct VolumeMeterComponent : Component, Timer
             source.setFlag(false);
             repaint();
         }
+    }
+
+    void resized() override
+    {
     }
 
 protected:
