@@ -1,22 +1,4 @@
-// VolumeMeter.h
-/***
-BEGIN_JUCE_MODULE_DECLARATION
-ID: VolumeMeter
-vendor: Arboreal Audio
-version: 1.0
-name: VolumeMeter
-description: Set of classes for drawing a simple volume/gr meter
-dependencies: juce_core, juce_dsp, juce_graphics, juce_gui_basics
-END_JUCE_MODULE_DECLARATION
-***/
-
-#pragma once
-#include <juce_core/juce_core.h>
-#include <juce_dsp/juce_dsp.h>
-#include <juce_graphics/juce_graphics.h>
-#include <juce_gui_basics/juce_gui_basics.h>
-
-using namespace juce;
+//VolumeMeter.h
 
 struct VolumeMeterSource
 {

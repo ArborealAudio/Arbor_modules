@@ -1,22 +1,5 @@
 // ReleasePool.h
 
-/***
-BEGIN_JUCE_MODULE_DECLARATION
-ID: ReleasePool
-vendor: Arboreal Audio
-version: 1.0
-name: ReleasePool
-description: Class for managing safe deletion of objects which need realtime capability
-dependencies: juce_core
-END_JUCE_MODULE_DECLARATION
-***/
-
-#pragma once
-#include <juce_core/juce_core.h>
-
-namespace strix
-{
-
 class ReleasePoolShared : Timer
 {
     std::vector<std::shared_ptr<void>> pool;
@@ -45,5 +28,3 @@ public:
         pool.emplace_back(object);
     }
 };
-
-} //namespace strix
