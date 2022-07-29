@@ -16,13 +16,13 @@ END_JUCE_MODULE_DECLARATION
 #include <juce_dsp/juce_dsp.h>
 #include <juce_graphics/juce_graphics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <xsimd/include/xsimd/xsimd.hpp>
 
 namespace strix
 {
-#include "VolumeMeter/VolumeMeter.h"
-#include "SVTFilter/SVTFilter.h"
-#include "ReleasePool/ReleasePool.h"
-#include "Delay/Delay.h"
-}
-
 using namespace juce;
+#include "modules/VolumeMeter/VolumeMeter.h"
+#include "modules/SVTFilter/SVTFilter.h"
+#include "modules/ReleasePool/ReleasePool.h"
+#include "modules/Delay/Delay.h"
+}
