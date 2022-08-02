@@ -27,6 +27,7 @@ struct VolumeMeterSource
     void measureBlock(const AudioBuffer<float>& buffer)
     {
         rmsL = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
+        rmsR = rmsL;
         if (buffer.getNumChannels() > 1)
             rmsR = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
 
@@ -110,17 +111,25 @@ struct VolumeMeterComponent : Component, Timer
                 auto dbL = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -100.f);
                 auto dbR = Decibels::gainToDecibels(owner.source.getAvgRMS(1), -100.f);
 
-                auto bounds = Rectangle<float>{ceilf(owner.getX()) + 1.f, ceilf(owner.getY()) + 1.f,
-                                            floorf(owner.getRight()) - ceilf(owner.getX()) + 2.f,
-                                            floorf(owner.getBottom()) - ceilf(owner.getY()) + 2.f};
+                auto ob = owner.getLocalBounds();
 
-                Rectangle<float> rectL = bounds.withTop(bounds.getY() + dbL * bounds.getHeight() / -100.f).removeFromLeft(bounds.getWidth() / 2.f + 5.f);
-                Rectangle<float> rectR = bounds.withTop(bounds.getY() + dbR * bounds.getHeight() / -100.f).removeFromRight(bounds.getWidth() / 2.f);
+                g.fillRect(ob.getCentreX() - 1, ob.getY(), 2, ob.getHeight());
+
+                auto bounds = Rectangle<float>{(float)ob.getX(), (float)ob.getY() + 4.f,
+                                            (float)ob.getRight() - ob.getX(),
+                                            (float)ob.getBottom() - ob.getY() - 2.f};
+
+                bounds.reduce(4.f, 4.f);
+
+                Rectangle<float> rectL = bounds.withTop(bounds.getY() + dbL * bounds.getHeight() / -100.f).removeFromLeft(bounds.getWidth() / 2.f - 3.f).toFloat();
+                Rectangle<float> rectR = bounds.withTop(bounds.getY() + dbR * bounds.getHeight() / -100.f).removeFromRight(bounds.getWidth() / 2.f - 3.f).toFloat();
+
+                g.setColour(Colours::lightgreen.withAlpha(0.6f));
 
                 g.fillRect(rectL);
                 g.fillRect(rectR);
                 break;
-                }
+            }
             case Reduction: {
                 g.setColour(Colours::white);
 
@@ -139,7 +148,7 @@ struct VolumeMeterComponent : Component, Timer
                     g.drawFittedText("GR", Rectangle<int>(0, 0, ob.getWidth(), 20), Justification::centred, 1);
                 }
                 break;
-                }
+            }
             default:
                 return;
             }
