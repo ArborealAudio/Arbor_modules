@@ -21,8 +21,8 @@ END_JUCE_MODULE_DECLARATION
 namespace strix
 {
 using namespace juce;
-#include "modules/VolumeMeter/VolumeMeter.h"
-#include "modules/SVTFilter/SVTFilter.h"
-#include "modules/ReleasePool/ReleasePool.h"
-#include "modules/Delay/Delay.h"
+#include "modules/VolumeMeter.h"
+#include "modules/SVTFilter.h"
+#include "modules/ReleasePool.h"
+#include "modules/Delay.h"
 }
