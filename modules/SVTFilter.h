@@ -68,6 +68,8 @@ public:
 
     T getResonance() { return resonance; }
 
+    T getGain() { return gain; }
+
     void reset()
     {
         for (auto v : {&s1, &s2})
