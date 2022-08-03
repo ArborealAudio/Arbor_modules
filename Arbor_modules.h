@@ -18,9 +18,12 @@ END_JUCE_MODULE_DECLARATION
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <xsimd/include/xsimd/xsimd.hpp>
 
+using vec = xsimd::batch<double>;
+
 namespace strix
 {
 using namespace juce;
+#include "modules/SIMD.h"
 #include "modules/VolumeMeter.h"
 #include "modules/SVTFilter.h"
 #include "modules/ReleasePool.h"
