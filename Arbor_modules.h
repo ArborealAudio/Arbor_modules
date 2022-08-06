@@ -7,7 +7,7 @@ version: 1.0
 name: Arbor_modules
 description: Parent module for several sub-modules, including VolumeMeter, SVTFilter,
 Release Pool, and Delay
-dependencies: juce_core, juce_dsp, juce_graphics, juce_gui_basics
+dependencies: juce_core, juce_dsp, juce_graphics, juce_gui_basics, xsimd
 END_JUCE_MODULE_DECLARATION
 ***/
 
