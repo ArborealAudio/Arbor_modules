@@ -7,7 +7,7 @@ version: 1.0
 name: Arbor_modules
 description: Parent module for several sub-modules, including VolumeMeter, SVTFilter,
 Release Pool, and Delay
-dependencies: juce_core, juce_dsp, juce_graphics, juce_gui_basics, xsimd
+dependencies: juce_core, juce_dsp, juce_graphics, juce_gui_basics
 END_JUCE_MODULE_DECLARATION
 ***/
 
@@ -16,7 +16,10 @@ END_JUCE_MODULE_DECLARATION
 #include <juce_dsp/juce_dsp.h>
 #include <juce_graphics/juce_graphics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include <xsimd/include/xsimd/xsimd.hpp>
+
+// JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4244)
+#include "xsimd/include/xsimd/xsimd.hpp"
+// JUCE_END_IGNORE_WARNINGS_MSVC
 
 using vec = xsimd::batch<double>;
 
