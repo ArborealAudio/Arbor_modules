@@ -26,6 +26,8 @@ struct VolumeMeterSource
 
     void measureBlock(const AudioBuffer<float>& buffer)
     {
+        peak = buffer.getMagnitude(0, buffer.getNumSamples());
+
         rmsL = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
         rmsR = rmsL;
         if (buffer.getNumChannels() > 1)
@@ -47,6 +49,8 @@ struct VolumeMeterSource
 
     void measureGR(float newGR)
     {
+        peak = newGR;
+
         if (rmsvec[0].size() > 0)
         {
             rmsvec[0][lPtr] = newGR * newGR;
@@ -66,6 +70,8 @@ struct VolumeMeterSource
         return std::sqrt(sum[ch]);
     }
 
+    inline float getPeak() { return peak; }
+
     void setFlag(bool flag)
     {
         newBuf = flag;
@@ -77,10 +83,11 @@ struct VolumeMeterSource
     }
 
 private:
-    bool newBuf = false;
+    std::atomic<bool> newBuf = false;
 
     float rmsSize = 0.f;
     float rmsL = 0.f, rmsR = 0.f;
+    float peak = 0.f;
     std::vector<float> rmsvec[2];
     size_t lPtr = 0, rPtr = 0;
     std::atomic<float> sum[2];
@@ -94,15 +101,26 @@ struct VolumeMeterComponent : Component, Timer
         Reduction
     };
 
+    enum Layout
+    {
+        Vertical,
+        Horizontal
+    };
+
     struct VolumeMeterLookAndFeel : LookAndFeel_V4
     {
-        VolumeMeterLookAndFeel(VolumeMeterComponent& comp, Type t) : owner(comp), type(t)
+        VolumeMeterLookAndFeel(VolumeMeterComponent& comp) : owner(comp)
         {}
 
         void setMeterType(Type newType) {type = newType;}
+        void setMeterLayout(Layout newLayout) { layout = newLayout; }
+        void setMeterColor(Colour newColor) { meterColor = newColor; }
 
         void drawMeterBar(Graphics& g)
         {
+            if (owner.isMouseButtonDown())
+                lastPeak = 0.f;
+
             switch (type)
             {
             case Volume: {
@@ -124,28 +142,51 @@ struct VolumeMeterComponent : Component, Timer
                 Rectangle<float> rectL = bounds.withTop(bounds.getY() + dbL * bounds.getHeight() / -100.f).removeFromLeft(bounds.getWidth() / 2.f - 3.f).toFloat();
                 Rectangle<float> rectR = bounds.withTop(bounds.getY() + dbR * bounds.getHeight() / -100.f).removeFromRight(bounds.getWidth() / 2.f - 3.f).toFloat();
 
-                g.setColour(Colours::lightgreen.withAlpha(0.6f));
+                g.setColour(meterColor);
 
                 g.fillRect(rectL);
                 g.fillRect(rectR);
                 break;
             }
             case Reduction: {
-                g.setColour(Colours::white);
+                g.setColour(meterColor);
 
                 auto db = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -60.f);
+                auto peak = Decibels::gainToDecibels(owner.source.getPeak(), -60.f);
 
                 auto ob = owner.getLocalBounds();
+                auto bounds = Rectangle<float>{ceilf(ob.getX()), ceilf(ob.getY()) + 1.f,
+                floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
 
-                auto bounds = Rectangle<float>{ceilf(ob.getX()) + 1.f, ceilf(ob.getY()) + 1.f,
-                                            floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f,
-                                            floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
+                if (layout == Vertical) {
+                    Rectangle<float> rect = bounds.withBottom(bounds.getY() - db * bounds.getHeight() / 36.f);
 
-                Rectangle<float> rect = bounds.withBottom(bounds.getY() - db * bounds.getHeight() / 60.f);
-
-                g.fillRect(rect.translated(0, 20));
-                if (db < 0.f) {
+                    g.fillRect(rect.translated(0, 20));
                     g.drawFittedText("GR", Rectangle<int>(0, 0, ob.getWidth(), 20), Justification::centred, 1);
+                }
+                else if (layout == Horizontal) {
+                    Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / 24.f).withTrimmedTop(10.f);
+
+                    g.fillRect(rect.translated(20, 0));
+
+                    g.drawFittedText("GR", Rectangle<int>(0, 0, 15, ob.getHeight()), Justification::centred, 1);
+
+                    if (peak < lastPeak) {
+                        g.fillRect((bounds.getX() - peak * bounds.getWidth() / 24.f) + 20, 10.f, 2.f, (float)ob.getHeight() - 10.f);
+                        lastPeak = peak;
+                    }
+                    else
+                        g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / 24.f) + 20, 10.f, 2.f, (float)ob.getHeight() - 10.f);
+
+                    for (float i = 0; i <= bounds.getWidth(); i += bounds.getWidth() / 6.f) {
+                        if (i > 0)
+                            g.fillRect(i + 19.f, 0.f, 2.f, 10.f);
+                        g.setFont(8.f);
+                        g.drawFittedText(String((i / bounds.getWidth()) * 24.f), Rectangle<int>(i + 10, 0, 10, 10), Justification::centred, 1);
+                    }
+
+                    if (db > 0.f)
+                        lastPeak = 0.f;
                 }
                 break;
             }
@@ -156,16 +197,20 @@ struct VolumeMeterComponent : Component, Timer
 
     private:
         Type type;
-        VolumeMeterComponent& owner;
+        Layout layout;
+        Colour meterColor;
+        VolumeMeterComponent &owner;
+
+        bool lastState = false;
+
+        float lastPeak = 0.f;
     };
 
-    void setMeterType(Type newType) 
-    {
-        type = newType;
-        lnf.setMeterType(type);
-    }
+    void setMeterType(Type newType) { lnf.setMeterType(newType); }
+    void setMeterLayout(Layout newLayout) { lnf.setMeterLayout(newLayout); }
+    void setMeterColor(Colour newColor) { lnf.setMeterColor(newColor); }
 
-    VolumeMeterComponent(VolumeMeterSource& v) : lnf(*this, type), source(v)
+    VolumeMeterComponent(VolumeMeterSource& v) : lnf(*this), source(v)
     {
         setLookAndFeel(&lnf);
         startTimerHz(30);
@@ -189,15 +234,32 @@ struct VolumeMeterComponent : Component, Timer
             source.setFlag(false);
             repaint();
         }
+
+        if (!*state && !anim.isAnimating(this)) {
+            anim.fadeOut(this, 500);
+            lastState = false;
+            setVisible(false);
+        }
+        else if (*state && !anim.isAnimating(this) && !lastState) {
+            anim.fadeIn(this, 500);
+            lastState = true;
+        }
     }
 
     void resized() override
     {
     }
 
+    // sets a pointer to a parameter which will control the meter's visibility
+    void setStatePointer(std::atomic<float> *newState) { state = newState; }
+
 protected:
-    VolumeMeterSource& source;
+    VolumeMeterSource &source;
+
 private:
-    Type type;
     VolumeMeterLookAndFeel lnf;
+    std::atomic<float> *state;
+    bool lastState = false;
+
+    ComponentAnimator anim;
 };
