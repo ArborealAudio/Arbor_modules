@@ -158,13 +158,15 @@ struct VolumeMeterComponent : Component, Timer
                 auto bounds = Rectangle<float>{ceilf(ob.getX()), ceilf(ob.getY()) + 1.f,
                 floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
 
-                if (layout == Vertical) {
+                if (layout == Vertical)
+                {
                     Rectangle<float> rect = bounds.withBottom(bounds.getY() - db * bounds.getHeight() / 36.f);
 
                     g.fillRect(rect.translated(0, 20));
                     g.drawFittedText("GR", Rectangle<int>(0, 0, ob.getWidth(), 20), Justification::centred, 1);
                 }
-                else if (layout == Horizontal) {
+                else if (layout == Horizontal)
+                {
                     Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / 24.f).withTrimmedTop(10.f);
 
                     g.fillRect(rect.translated(20, 0));
@@ -185,7 +187,7 @@ struct VolumeMeterComponent : Component, Timer
                         g.drawFittedText(String((i / bounds.getWidth()) * 24.f), Rectangle<int>(i + 10, 0, 10, 10), Justification::centred, 1);
                     }
 
-                    if (db > 0.f)
+                    if (owner.getState() && !*owner.getState())
                         lastPeak = 0.f;
                 }
                 break;
@@ -195,13 +197,11 @@ struct VolumeMeterComponent : Component, Timer
             }
         }
 
-    private:
         Type type;
+    private:
         Layout layout;
         Colour meterColor;
         VolumeMeterComponent &owner;
-
-        bool lastState = false;
 
         float lastPeak = 0.f;
     };
@@ -210,7 +210,11 @@ struct VolumeMeterComponent : Component, Timer
     void setMeterLayout(Layout newLayout) { lnf.setMeterLayout(newLayout); }
     void setMeterColor(Colour newColor) { lnf.setMeterColor(newColor); }
 
-    VolumeMeterComponent(VolumeMeterSource& v) : lnf(*this), source(v)
+    /**
+     * @param v audio source for the meter
+     * @param s parameter the meter may be attached to (like a compression param, for instance)
+    */
+    VolumeMeterComponent(VolumeMeterSource& v, std::atomic<float>* s = nullptr) : lnf(*this), source(v), state(s)
     {
         setLookAndFeel(&lnf);
         startTimerHz(30);
@@ -235,14 +239,16 @@ struct VolumeMeterComponent : Component, Timer
             repaint();
         }
 
-        if (!*state && !anim.isAnimating(this)) {
-            anim.fadeOut(this, 500);
-            lastState = false;
-            setVisible(false);
-        }
-        else if (*state && !anim.isAnimating(this) && !lastState) {
-            anim.fadeIn(this, 500);
-            lastState = true;
+        if (lnf.type == Type::Reduction) {
+            if (!*state && !anim.isAnimating(this)) {
+                anim.fadeOut(this, 500);
+                lastState = false;
+                setVisible(false);
+            }
+            else if (*state && !anim.isAnimating(this) && !lastState) {
+                anim.fadeIn(this, 500);
+                lastState = true;
+            }
         }
     }
 
@@ -250,8 +256,7 @@ struct VolumeMeterComponent : Component, Timer
     {
     }
 
-    // sets a pointer to a parameter which will control the meter's visibility
-    void setStatePointer(std::atomic<float> *newState) { state = newState; }
+    std::atomic<float> *getState() { return state; }
 
 protected:
     VolumeMeterSource &source;
