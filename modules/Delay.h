@@ -40,7 +40,7 @@ public:
         jassert (isPositiveAndNotGreaterThan (newDelayInSamples, upperLimit));
 
         delay = xsimd::max((SampleType)0.0, xsimd::min(newDelayInSamples, upperLimit));
-        delayInt = static_cast<int>(std::floor(xsimd::add(delay) / xsimd::batch<double>::size));
+        delayInt = static_cast<int>(std::floor(xsimd::reduce_add(delay)));
         delayFrac = delay - (SampleType) delayInt;
     }
 
