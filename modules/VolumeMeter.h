@@ -112,7 +112,7 @@ struct VolumeMeterComponent : Component, Timer
         VolumeMeterLookAndFeel(VolumeMeterComponent& comp) : owner(comp)
         {}
 
-        void setMeterType(Type newType) {type = newType;}
+        void setMeterType(Type newType) { type = newType; }
         void setMeterLayout(Layout newLayout) { layout = newLayout; }
         void setMeterColor(Colour newColor) { meterColor = newColor; }
 
@@ -167,6 +167,7 @@ struct VolumeMeterComponent : Component, Timer
                 }
                 else if (layout == Horizontal)
                 {
+                    db = jmax(db, -21.f);
                     Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / 24.f).withTrimmedTop(10.f);
 
                     g.fillRect(rect.translated(20, 0));
@@ -174,6 +175,7 @@ struct VolumeMeterComponent : Component, Timer
                     g.drawFittedText("GR", Rectangle<int>(0, 0, 15, ob.getHeight()), Justification::centred, 1);
 
                     if (peak < lastPeak) {
+                        peak = jmax(peak, -21.f);
                         g.fillRect((bounds.getX() - peak * bounds.getWidth() / 24.f) + 20, 10.f, 2.f, (float)ob.getHeight() - 10.f);
                         lastPeak = peak;
                     }
@@ -233,10 +235,10 @@ struct VolumeMeterComponent : Component, Timer
 
     void timerCallback() override
     {
-        if (&source && source.getFlag())
+        if (source.getFlag())
         {
             source.setFlag(false);
-            repaint();
+            repaint(getLocalBounds());
         }
 
         if (lnf.type == Type::Reduction) {
