@@ -83,7 +83,7 @@ struct VolumeMeterSource
     }
 
 private:
-    std::atomic<bool> newBuf = false;
+    std::atomic<bool> newBuf;
 
     float rmsSize = 0.f;
     float rmsL = 0.f, rmsR = 0.f;

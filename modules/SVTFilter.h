@@ -25,7 +25,7 @@ class SVTFilter
 
     void update()
     {
-        if constexpr (std::is_same_v<T, double>)
+        if constexpr (std::is_same<T, double>::value)
             g = (double)(std::tan(MathConstants<double>::pi * cutoffFrequency / sampleRate));
         else
             g = (T)(xsimd::tan((T)MathConstants<double>::pi * cutoffFrequency / (T)sampleRate));
