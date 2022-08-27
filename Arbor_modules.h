@@ -29,6 +29,7 @@ using namespace juce;
 #include "modules/SIMD.h"
 #include "modules/VolumeMeter.h"
 #include "modules/SVTFilter.h"
+#include "modules/LRFilter.h"
 #include "modules/ReleasePool.h"
 #include "modules/Delay.h"
 }
