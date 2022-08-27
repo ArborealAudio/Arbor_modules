@@ -10,7 +10,7 @@ class LinkwitzRileyFilter
 {
 public:
     //==============================================================================
-    using Type = LRiFilterType;
+    using Type = LRFilterType;
 
     //==============================================================================
     /** Constructor. */
@@ -44,7 +44,7 @@ public:
 
     //==============================================================================
     /** Initialises the filter. */
-    void prepare (const ProcessSpec& spec)
+    void prepare (const dsp::ProcessSpec& spec)
     {
         jassert (spec.sampleRate > 0);
         jassert (spec.numChannels > 0);
@@ -147,23 +147,19 @@ public:
         outputHigh = yL - R2 * yB + yH - yL2;
     }
 
-    /** Ensure that the state variables are rounded to zero if the state
-        variables are denormals. This is only needed if you are doing
-        sample by sample processing.
-    */
-    void snapToZero() noexcept
-    {
-        for (auto s : { &s1, &s2, &s3, &s4 })
-            for (auto& element : *s)
-                util::snapToZero (element);
-    }
-
 private:
     //==============================================================================
     void update()
     {
-        g  = (SampleType) std::tan (MathConstants<double>::pi * cutoffFrequency / sampleRate);
-        R2 = (SampleType) std::sqrt (2.0);
+        if constexpr (std::is_same<SampleType, double>::value) {
+            g  = (SampleType) std::tan (MathConstants<double>::pi * cutoffFrequency / sampleRate);
+            R2 = (SampleType) std::sqrt (2.0);
+        }
+        else {
+            g = xsimd::tan (MathConstants<double>::pi * cutoffFrequency / sampleRate);
+            R2 = xsimd::sqrt (2.0);
+        }
+        
         h  = (SampleType) (1.0 / (1.0 + R2 * g + g * g));
     }
 
