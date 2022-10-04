@@ -123,7 +123,7 @@ namespace SampleTypeHelpers // Internal classes needed for handling sample type 
     This class doesn't own any of the data which it points to, it's simply a view
     into data that is owned elsewhere. You can construct one from some raw data
     that you've allocated yourself, or give it a HeapBlock to use, or give it
-    an AudioBuffer which it can refer to, but in all cases the user is
+    an Buffer which it can refer to, but in all cases the user is
     responsible for making sure that the data doesn't get deleted while there's
     still an AudioBlock using it.
 
@@ -207,39 +207,24 @@ public:
         }
     }
 
-    /** Creates an AudioBlock that points to the data in an AudioBuffer.
+    /** Creates an AudioBlock that points to the data in an Buffer.
         AudioBlock does not copy nor own the memory pointed to by dataToUse.
         Therefore it is the user's responsibility to ensure that the buffer is retained
         throughout the life-time of the AudioBlock without being modified.
     */
-    template <typename OtherSampleType>
-    constexpr AudioBlock (AudioBuffer<OtherSampleType>& buffer) noexcept
+    constexpr AudioBlock (strix::Buffer<SampleType>& buffer) noexcept
         : channels (buffer.getArrayOfWritePointers()),
           numChannels (static_cast<ChannelCountType> (buffer.getNumChannels())),
           numSamples (static_cast<size_t> (buffer.getNumSamples()))
     {
     }
 
-    /** Creates an AudioBlock that points to the data in an AudioBuffer.
+    /** Creates an AudioBlock that points to the data in an Buffer.
         AudioBlock does not copy nor own the memory pointed to by dataToUse.
         Therefore it is the user's responsibility to ensure that the buffer is retained
         throughout the life-time of the AudioBlock without being modified.
     */
-    template <typename OtherSampleType>
-    constexpr AudioBlock (const AudioBuffer<OtherSampleType>& buffer) noexcept
-        : channels (buffer.getArrayOfReadPointers()),
-          numChannels (static_cast<ChannelCountType> (buffer.getNumChannels())),
-          numSamples (static_cast<size_t> (buffer.getNumSamples()))
-    {
-    }
-
-    /** Creates an AudioBlock that points to the data in an AudioBuffer.
-        AudioBlock does not copy nor own the memory pointed to by dataToUse.
-        Therefore it is the user's responsibility to ensure that the buffer is retained
-        throughout the life-time of the AudioBlock without being modified.
-    */
-    template <typename OtherSampleType>
-    AudioBlock (AudioBuffer<OtherSampleType>& buffer, size_t startSampleIndex) noexcept
+    AudioBlock (strix::Buffer<SampleType>& buffer, size_t startSampleIndex) noexcept
         : channels (buffer.getArrayOfWritePointers()),
           numChannels (static_cast<ChannelCountType> (buffer.getNumChannels())),
           startSample (startSampleIndex),
@@ -379,29 +364,29 @@ public:
     template <typename OtherSampleType>
     const AudioBlock& copyFrom (const AudioBlock<OtherSampleType>& src) const noexcept   { copyFromInternal (src); return *this; }
 
-    /** Copy the values from an AudioBuffer to this block.
+    /** Copy the values from an Buffer to this block.
 
         All indices and sizes are in this AudioBlock's units, i.e. if SampleType is a
         SIMDRegister then incrementing srcPos by one will increase the sample position
-        in the AudioBuffer's units by a factor of SIMDRegister<SampleType>::SIMDNumElements.
+        in the Buffer's units by a factor of SIMDRegister<SampleType>::SIMDNumElements.
     */
     template <typename OtherNumericType>
-    AudioBlock&       copyFrom (const AudioBuffer<OtherNumericType>& src,
+    AudioBlock&       copyFrom (const Buffer<OtherNumericType>& src,
                                 size_t srcPos = 0, size_t dstPos = 0,
                                 size_t numElements = std::numeric_limits<size_t>::max())         { copyFromInternal (src, srcPos, dstPos, numElements); return *this; }
     template <typename OtherNumericType>
-    const AudioBlock& copyFrom (const AudioBuffer<OtherNumericType>& src,
+    const AudioBlock& copyFrom (const Buffer<OtherNumericType>& src,
                                 size_t srcPos = 0, size_t dstPos = 0,
                                 size_t numElements = std::numeric_limits<size_t>::max()) const   { copyFromInternal (src, srcPos, dstPos, numElements); return *this; }
 
 
-    /** Copies the values from this block to an AudioBuffer.
+    /** Copies the values from this block to an Buffer.
 
         All indices and sizes are in this AudioBlock's units, i.e. if SampleType is a
         SIMDRegister then incrementing dstPos by one will increase the sample position
-        in the AudioBuffer's units by a factor of SIMDRegister<SampleType>::SIMDNumElements.
+        in the Buffer's units by a factor of SIMDRegister<SampleType>::SIMDNumElements.
     */
-    void copyTo (AudioBuffer<typename std::remove_const<NumericType>::type>& dst, size_t srcPos = 0, size_t dstPos = 0,
+    void copyTo (Buffer<typename std::remove_const<NumericType>::type>& dst, size_t srcPos = 0, size_t dstPos = 0,
                  size_t numElements = std::numeric_limits<size_t>::max()) const
     {
         auto dstlen = static_cast<size_t> (dst.getNumSamples()) / sizeFactor;
@@ -689,7 +674,7 @@ private:
     }
 
     template <typename OtherNumericType>
-    void copyFromInternal (const AudioBuffer<OtherNumericType>& src, size_t srcPos, size_t dstPos, size_t numElements) const
+    void copyFromInternal (const Buffer<OtherNumericType>& src, size_t srcPos, size_t dstPos, size_t numElements) const
     {
         auto srclen = static_cast<size_t> (src.getNumSamples()) / sizeFactor;
         auto n = jmin (srclen - srcPos, numSamples - dstPos, numElements) * sizeFactor;
@@ -953,4 +938,25 @@ private:
 
     template <typename OtherSampleType>
     friend class AudioBlock;
+};
+
+/* custom ProcessContext for using custom AudioBlocks */
+template <typename T>
+struct ProcessContextReplacing
+{
+    using SampleType = T;
+    
+    ProcessContextReplacing(AudioBlock<T> &block) noexcept : ioBlock(block)
+    {
+    }
+
+    const AudioBlock<const T> &getInputBlock() const noexcept { return constBlock; }
+
+    AudioBlock<T> &getOutputBlock() const noexcept { return ioBlock; }
+
+    bool isBypassed = false;
+
+private:
+    AudioBlock<T>& ioBlock;
+    AudioBlock<const T> constBlock {ioBlock};
 };
