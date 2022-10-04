@@ -114,7 +114,8 @@ struct VolumeMeterComponent : Component, Timer
         VolumeMeterLookAndFeel(VolumeMeterComponent& comp) : owner(comp)
         {}
 
-        void setMeterType(Type newType) { type = newType; }
+        void setMeterType(Type newType) { type = newType;
+            if (type == Type::Reduction) lastPeak = 0.f; }
         void setMeterLayout(Layout newLayout) { layout = newLayout; }
         void setMeterColor(Colour newColor) { meterColor = newColor; }
 
