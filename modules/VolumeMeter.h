@@ -107,6 +107,8 @@ struct VolumeMeterComponent : Component, Timer
         Horizontal
     };
 
+    bool clipIndicator = false;
+
     struct VolumeMeterLookAndFeel : LookAndFeel_V4
     {
         VolumeMeterLookAndFeel(VolumeMeterComponent& comp) : owner(comp)
@@ -118,37 +120,73 @@ struct VolumeMeterComponent : Component, Timer
 
         void drawMeterBar(Graphics& g)
         {
-            if (owner.isMouseButtonDown())
-                lastPeak = 0.f;
-
             switch (type)
             {
             case Volume: {
+                if (owner.isMouseButtonDown() || owner.numTicks >= 300) {
+                    lastPeak = -90.f;
+                    owner.numTicks = 0;
+                }
+
                 g.setColour(Colours::white);
 
                 auto dbL = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -100.f);
                 auto dbR = Decibels::gainToDecibels(owner.source.getAvgRMS(1), -100.f);
 
-                auto ob = owner.getLocalBounds();
+                auto peak = Decibels::gainToDecibels(owner.source.getPeak(), -100.f);
+
+                auto ob = owner.getLocalBounds().withTrimmedTop(owner.getHeight() * 0.1f);
 
                 g.fillRect(ob.getCentreX() - 1, ob.getY(), 2, ob.getHeight());
 
                 auto bounds = Rectangle<float>{(float)ob.getX(), (float)ob.getY() + 4.f,
-                                            (float)ob.getRight() - ob.getX(),
-                                            (float)ob.getBottom() - ob.getY() - 2.f};
+                                                (float)ob.getRight() - ob.getX(),
+                                                (float)ob.getBottom() - ob.getY() - 2.f};
 
                 bounds.reduce(4.f, 4.f);
 
-                Rectangle<float> rectL = bounds.withTop(bounds.getY() + dbL * bounds.getHeight() / -100.f).removeFromLeft(bounds.getWidth() / 2.f - 3.f).toFloat();
-                Rectangle<float> rectR = bounds.withTop(bounds.getY() + dbR * bounds.getHeight() / -100.f).removeFromRight(bounds.getWidth() / 2.f - 3.f).toFloat();
+                /*RMS meter*/
+
+                Rectangle<float> rectL = bounds.withTop(bounds.getY() + jmax(dbL * bounds.getHeight() / -100.f, 0.f)).removeFromLeft(bounds.getWidth() / 2.f - 3.f);
+                Rectangle<float> rectR = bounds.withTop(bounds.getY() + jmax(dbR * bounds.getHeight() / -100.f, 0.f)).removeFromRight(bounds.getWidth() / 2.f - 3.f);
 
                 g.setColour(meterColor);
 
                 g.fillRect(rectL);
                 g.fillRect(rectR);
+
+                /*peak ticks*/
+
+                if (lastPeak > peak)
+                {
+                    if (lastPeak > 0.f && owner.clipIndicator)
+                        g.setColour(Colours::red);
+                    else
+                        g.setColour(Colours::white);
+
+                    g.drawHorizontalLine((int)bounds.getY() + jmax(lastPeak * bounds.getHeight() / -100.f, 0.f), bounds.getX(), bounds.getRight());
+
+                    g.drawFittedText(String(lastPeak, 1) + "dB", owner.getLocalBounds().removeFromTop(owner.getHeight() * 0.1f), Justification::centred, 1);
+                }
+                else
+                {
+                    if (peak > 0.f && owner.clipIndicator)
+                        g.setColour(Colours::red);
+                    else
+                        g.setColour(Colours::white);
+
+                    g.drawHorizontalLine((int)bounds.getY() + jmax(peak * bounds.getHeight() / -100.f, 0.f), bounds.getX(), bounds.getRight());
+
+                    g.drawFittedText(String(peak, 1) + "dB", owner.getLocalBounds().removeFromTop(owner.getHeight() * 0.1f), Justification::centred, 1);
+
+                    lastPeak = peak;
+                }
                 break;
             }
             case Reduction: {
+                if (owner.isMouseButtonDown())
+                    lastPeak = 0.f;
+
                 g.setColour(meterColor);
 
                 auto db = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -60.f);
@@ -189,7 +227,7 @@ struct VolumeMeterComponent : Component, Timer
                         g.drawFittedText(String((i / bounds.getWidth()) * 24.f), Rectangle<int>(i + 10, 0, 10, 10), Justification::centred, 1);
                     }
 
-                    if (owner.getState() && !*owner.getState())
+                    if (owner.getState() && !*owner.getState()) /*reset peak if comp is turned off*/
                         lastPeak = 0.f;
                 }
                 break;
@@ -205,7 +243,7 @@ struct VolumeMeterComponent : Component, Timer
         Colour meterColor;
         VolumeMeterComponent &owner;
 
-        float lastPeak = 0.f;
+        float lastPeak = -90.f;
     };
 
     void setMeterType(Type newType) { lnf.setMeterType(newType); }
@@ -235,6 +273,8 @@ struct VolumeMeterComponent : Component, Timer
 
     void timerCallback() override
     {
+        ++numTicks;
+
         if (source.getFlag())
         {
             source.setFlag(false);
@@ -262,7 +302,7 @@ struct VolumeMeterComponent : Component, Timer
 
 protected:
     VolumeMeterSource &source;
-
+    int numTicks = 0;
 private:
     VolumeMeterLookAndFeel lnf;
     std::atomic<float> *state;
