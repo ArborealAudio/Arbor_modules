@@ -6,28 +6,28 @@ vendor: Arboreal Audio
 version: 1.0
 name: Arbor_modules
 description: Parent module for several sub-modules, including VolumeMeter, SVTFilter,
-Release Pool, and Delay
-dependencies: juce_core, juce_dsp, juce_graphics, juce_gui_basics
+LRFilter, SIMD, AudioBlock, Buffer, Release Pool, and Delay
+dependencies: juce_audio_basics, juce_dsp, juce_graphics, juce_gui_basics
 END_JUCE_MODULE_DECLARATION
 ***/
 
 #pragma once
-#include <juce_core/juce_core.h>
+#include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_dsp/juce_dsp.h>
 #include <juce_graphics/juce_graphics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
-// JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4244)
 #include "xsimd/include/xsimd/xsimd.hpp"
-// JUCE_END_IGNORE_WARNINGS_MSVC
 
 using vec = xsimd::batch<double>;
 
 namespace strix
 {
 using namespace juce;
+#include "modules/Buffer.h"
 #include "modules/SIMD.h"
 #include "modules/VolumeMeter.h"
+#include "modules/IIRFilter.h"
 #include "modules/SVTFilter.h"
 #include "modules/LRFilter.h"
 #include "modules/ReleasePool.h"
