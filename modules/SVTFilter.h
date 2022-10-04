@@ -106,6 +106,8 @@ public:
         auto &ls1 = s1[channel];
         auto &ls2 = s2[channel];
 
+        in *= gain;
+
         auto yHP = h * (in - ls1 * (g + R2) - ls2);
 
         auto yBP = yHP * g + ls1;
@@ -117,23 +119,23 @@ public:
         switch (type)
         {
         case FilterType::lowpass:
-            return yLP * gain;
+            return yLP/*  * gain */;
         case FilterType::highpass:
-            return yHP * gain;
+            return yHP/*  * gain */;
         case FilterType::bandpass:
-            return yBP * gain;
+            return yBP/*  * gain */;
         case FilterType::notch:
-            return (yLP + yHP) * gain;
+            return (yLP + yHP)/*  * gain */;
         case FilterType::peak:
-            return (yLP - yHP) * gain;
+            return (yLP - yHP)/*  * gain */;
         case FilterType::firstOrderLowpass:
-            return (yLP + yBP) * gain;
+            return (yLP + yBP)/*  * gain */;
         case FilterType::firstOrderHighpass:
-            return (yHP + yBP) * gain;
+            return (yHP + yBP)/*  * gain */;
         case FilterType::allpass:
-            return (in - ((yBP * R2) + (yBP * R2))) * gain;
+            return (in - ((yBP * R2) + (yBP * R2)))/*  * gain */;
         default:
-            return yLP * gain;
+            return yLP/*  * gain */;
         }
     }
 };
