@@ -126,7 +126,7 @@ public:
         }
     }
 
-    void copyFrom(int destChan, const Type* source, int numSamples) noexcept
+    void copyFrom(int destChan, int startSample, const Type* source, int numSamples) noexcept
     {
         jassert(isPositiveAndBelow(destChan, nChannels));
         jassert(numSamples < nSamples);
