@@ -185,8 +185,10 @@ struct VolumeMeterComponent : Component, Timer
                 break;
             }
             case Reduction: {
-                if (owner.isMouseButtonDown())
+                if (owner.isMouseButtonDown() || owner.numTicks >= 300) {
+                    owner.numTicks = 0;
                     lastPeak = 0.f;
+                }
 
                 g.setColour(meterColor);
 
@@ -253,7 +255,7 @@ struct VolumeMeterComponent : Component, Timer
 
     /**
      * @param v audio source for the meter
-     * @param s parameter the meter may be attached to (like a compression param, for instance)
+     * @param s parameter the meter may be attached to (like a compression param, for instance). Used for turning the display on/off
     */
     VolumeMeterComponent(VolumeMeterSource& v, std::atomic<float>* s = nullptr) : lnf(*this), source(v), state(s)
     {
@@ -295,11 +297,8 @@ struct VolumeMeterComponent : Component, Timer
         }
     }
 
-    void resized() override
-    {
-    }
-
     std::atomic<float> *getState() { return state; }
+    void setState(std::atomic<float>* newState) { state = newState; }
 
 protected:
     VolumeMeterSource &source;
