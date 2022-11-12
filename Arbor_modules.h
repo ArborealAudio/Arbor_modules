@@ -6,7 +6,7 @@ vendor: Arboreal Audio
 version: 1.0
 name: Arbor_modules
 description: Parent module for several sub-modules, including VolumeMeter, SVTFilter,
-LRFilter, SIMD, AudioBlock, Buffer, Release Pool, and Delay
+LRFilter, SIMD, AudioBlock, Buffer, Release Pool, Parameter and Delay
 dependencies: juce_audio_basics, juce_dsp, juce_graphics, juce_gui_basics
 END_JUCE_MODULE_DECLARATION
 ***/
@@ -32,4 +32,5 @@ using namespace juce;
 #include "modules/LRFilter.h"
 #include "modules/ReleasePool.h"
 #include "modules/Delay.h"
+#include "modules/Parameter.h"
 }
