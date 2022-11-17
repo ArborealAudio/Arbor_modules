@@ -45,7 +45,7 @@ struct MSMatrix
 struct Balance
 {
     template <typename T>
-    inline static void processBalance(dsp::AudioBlock<T>& block, float balance, bool ms = false)
+    inline static void processBalance(dsp::AudioBlock<T>& block, float balance, bool ms)
     {
         if (ms)
             block.getSingleChannelBlock(1).multiplyBy(balance);
