@@ -28,6 +28,7 @@ namespace strix
 using namespace juce;
 #include "modules/Buffer.h"
 #include "modules/SIMD.h"
+#include "modules/FastMath.h"
 #include "modules/VolumeMeter.h"
 #include "modules/IIRFilter.h"
 #include "modules/SVTFilter.h"
