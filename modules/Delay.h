@@ -45,10 +45,10 @@ public:
     }
 
     /** Returns the current delay in samples. */
-    // SampleType getDelay() const
-    // {
-    //     return delay;
-    // }
+    SampleType getDelay() const
+    {
+        return delay;
+    }
 
     //==============================================================================
     /** Initialises the processor. */
@@ -147,7 +147,7 @@ public:
 
         return result;
     }
-
+    
     xsimd::batch<double> popSample (int channel, xsimd::batch<double> delayInSamples = -1, bool updateReadPointer = true)
     {
         if (xsimd::any(delayInSamples >= 0))
