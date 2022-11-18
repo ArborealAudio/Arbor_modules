@@ -36,5 +36,6 @@ using namespace juce;
 #include "modules/ReleasePool.h"
 #include "modules/Delay.h"
 #include "modules/Parameter.h"
-#include "modules/MSMatrix.h"
+#include "modules/SmoothGain.h"
+#include "modules/StereoImaging.h"
 }
