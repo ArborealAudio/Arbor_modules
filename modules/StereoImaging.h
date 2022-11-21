@@ -167,7 +167,7 @@ public:
 
             auto mid = (left[i] + right[i]) * 0.5;
             auto side = (left[i] - right[i]) * 0.5;
-            side += d;
+            side += d * 0.5;
 
             left[i] = mid + side;
             right[i] = mid - side;
@@ -179,7 +179,7 @@ public:
     }
 
 private:
-    strix::Delay<T> delay{441};
+    strix::Delay<T> delay{4410};
     double SR = 44100.0;
 
     T lastMult = 0.0;
