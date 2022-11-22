@@ -15,7 +15,7 @@ public:
                          NormalisableRange<float> normalisableRange,
                          float defaultValue,
                          const AudioParameterFloatAttributes& attributes = {})
-        : AudioParameterFloat(parameterID, parameterName, normalisableRange, defaultValue, attributes), range(normalisableRange)
+        : AudioParameterFloat(parameterID, parameterName, normalisableRange, defaultValue, attributes)
     {
     }
 
@@ -35,15 +35,17 @@ public:
         modulationAmount = (float)amount;
     }
 
-    float getCurrentValue()
+    float getCurrentValue() const
     {
         return range.convertFrom0to1(jlimit(0.0f, 1.0f, range.convertTo0to1(get()) + modulationAmount));
     }
+
+    operator float() const { return getCurrentValue(); }
 
 private:
 
     float modulationAmount = 0.f;
 
-    const NormalisableRange<float> range;
+    // const NormalisableRange<float> range;
 
 };
