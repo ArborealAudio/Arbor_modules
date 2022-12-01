@@ -1,4 +1,4 @@
-//SVTFilter.h
+// SVTFilter.h
 
 enum class FilterType
 {
@@ -17,11 +17,11 @@ class SVTFilter
 {
     double sampleRate = 44100.0;
     T g, h, R2;
-    std::vector<T> s1{2}, s2{2};
+    std::vector<T> s1{ 2 }, s2{ 2 };
 
     T cutoffFrequency = (T)1000.0,
-        resonance = (T)1.0 / std::sqrt(2.0),
-        gain = (T)1.0;
+      resonance = (T)1.0 / std::sqrt(2.0),
+      gain = (T)1.0;
 
     void update()
     {
@@ -37,7 +37,6 @@ class SVTFilter
     FilterType type = FilterType::lowpass;
 
 public:
-
     SVTFilter()
     {
         update();
@@ -72,11 +71,11 @@ public:
 
     void reset()
     {
-        for (auto v : {&s1, &s2})
-            std::fill(v->begin(), v->end(), 0.0);
+        std::fill(s1.begin(), s1.end(), 0.0);
+        std::fill(s2.begin(), s2.end(), 0.0);
     }
 
-    void prepare(const dsp::ProcessSpec& spec)
+    void prepare(const dsp::ProcessSpec &spec)
     {
         sampleRate = spec.sampleRate;
 
@@ -88,7 +87,7 @@ public:
     }
 
     template <class Block>
-    void processBlock(Block& block)
+    void processBlock(Block &block)
     {
         for (auto ch = 0; ch < block.getNumChannels(); ++ch)
         {
@@ -101,8 +100,11 @@ public:
         }
     }
 
-    T processSample(int channel, T in)
+    T processSample(size_t channel, T in)
     {
+        assert(s1.size() > channel && s1.size() > 0);
+        assert(s2.size() > channel && s2.size() > 0);
+
         auto &ls1 = s1[channel];
         auto &ls2 = s2[channel];
 
@@ -119,23 +121,23 @@ public:
         switch (type)
         {
         case FilterType::lowpass:
-            return yLP/*  * gain */;
+            return yLP /*  * gain */;
         case FilterType::highpass:
-            return yHP/*  * gain */;
+            return yHP /*  * gain */;
         case FilterType::bandpass:
-            return yBP/*  * gain */;
+            return yBP /*  * gain */;
         case FilterType::notch:
-            return (yLP + yHP)/*  * gain */;
+            return (yLP + yHP) /*  * gain */;
         case FilterType::peak:
-            return (yLP - yHP)/*  * gain */;
+            return (yLP - yHP) /*  * gain */;
         case FilterType::firstOrderLowpass:
-            return (yLP + yBP)/*  * gain */;
+            return (yLP + yBP) /*  * gain */;
         case FilterType::firstOrderHighpass:
-            return (yHP + yBP)/*  * gain */;
+            return (yHP + yBP) /*  * gain */;
         case FilterType::allpass:
-            return (in - ((yBP * R2) + (yBP * R2)))/*  * gain */;
+            return (in - ((yBP * R2) + (yBP * R2))) /*  * gain */;
         default:
-            return yLP/*  * gain */;
+            return yLP /*  * gain */;
         }
     }
 };
