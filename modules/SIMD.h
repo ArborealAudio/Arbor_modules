@@ -294,6 +294,11 @@ public:
         return channels[channel] + startSample;
     }
 
+    SampleType **getArrayOfChannelPointers() const noexcept
+    {
+        return channels;
+    }
+
     /** Returns an AudioBlock that represents one of the channels in this block. */
     AudioBlock getSingleChannelBlock (size_t channel) const noexcept
     {
