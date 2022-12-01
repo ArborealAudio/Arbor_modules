@@ -1,10 +1,13 @@
 //VolumeMeter.h
 
-struct VolumeMeterSource
+struct VolumeMeterSource : Timer
 {
-    VolumeMeterSource() = default;
+    VolumeMeterSource()
+    {
+        startTimerHz(20);
+    }
 
-    ~VolumeMeterSource(){}
+    ~VolumeMeterSource() { stopTimer(); }
 
     void prepare(const dsp::ProcessSpec& spec)
     {
@@ -24,7 +27,13 @@ struct VolumeMeterSource
         }
     }
 
-    void measureBlock(const AudioBuffer<float>& buffer)
+    void copyBuffer(const AudioBuffer<float> &_buffer)
+    {
+        buffer.makeCopyOf(_buffer, true);
+        bufCopied = true;
+    }
+
+    void measureBlock()
     {
         peak = buffer.getMagnitude(0, buffer.getNumSamples());
 
@@ -45,6 +54,15 @@ struct VolumeMeterSource
         }
 
         newBuf = true;
+    }
+
+    void timerCallback() override
+    {
+        if (bufCopied)
+        {
+            measureBlock();
+            bufCopied = false;
+        }
     }
 
     void measureGR(float newGR)
@@ -82,8 +100,10 @@ struct VolumeMeterSource
         return newBuf;
     }
 
+
 private:
-    std::atomic<bool> newBuf;
+    std::atomic<bool> newBuf = false, bufCopied = false;
+    AudioBuffer<float> buffer;
 
     float rmsSize = 0.f;
     float rmsL = 0.f, rmsR = 0.f;
