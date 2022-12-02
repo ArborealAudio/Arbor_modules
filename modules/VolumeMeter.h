@@ -1,27 +1,34 @@
-//VolumeMeter.h
+// VolumeMeter.h
 
 struct VolumeMeterSource : Timer
 {
     VolumeMeterSource()
     {
-        startTimerHz(20);
+        startTimerHz(60);
     }
 
     ~VolumeMeterSource() { stopTimer(); }
 
-    void prepare(const dsp::ProcessSpec& spec)
+    void prepare(const dsp::ProcessSpec &spec)
     {
+        numSamplesToRead = spec.maximumBlockSize;
+        mainBuf.setSize(spec.numChannels, 44100);
+        rmsBuf.setSize(spec.numChannels, numSamplesToRead);
+        fifo.setTotalSize(numSamplesToRead);
+
         rmsSize = (0.1f * spec.sampleRate) / (float)spec.maximumBlockSize;
         rmsvec[0].assign(rmsSize, 0.f);
         rmsvec[1].assign(rmsSize, 0.f);
 
         sum[0] = sum[1] = 0.f;
 
-        if (rmsSize > 1){
+        if (rmsSize > 1)
+        {
             lPtr %= rmsvec[0].size();
             rPtr %= rmsvec[1].size();
         }
-        else {
+        else
+        {
             lPtr = 0;
             rPtr = 0;
         }
@@ -29,26 +36,51 @@ struct VolumeMeterSource : Timer
 
     void copyBuffer(const AudioBuffer<float> &_buffer)
     {
-        buffer.makeCopyOf(_buffer, true);
+        const auto numSamples = _buffer.getNumSamples();
+        const auto scope = fifo.write(numSamples);
+        if (scope.blockSize1 > 0)
+        {
+            mainBuf.copyFrom(0, scope.startIndex1, _buffer, 0, 0, scope.blockSize1);
+            mainBuf.copyFrom(1, scope.startIndex1, _buffer, 1, 0, scope.blockSize1);
+        }
+        if (scope.blockSize2 > 0)
+        {
+            mainBuf.copyFrom(0, scope.startIndex2, _buffer, 0, 0, scope.blockSize2);
+            mainBuf.copyFrom(1, scope.startIndex2, _buffer, 1, 0, scope.blockSize2);
+        }
         bufCopied = true;
     }
 
     void measureBlock()
     {
-        peak = buffer.getMagnitude(0, buffer.getNumSamples());
+        const auto scope = fifo.read(numSamplesToRead);
+        if (scope.blockSize1 > 0)
+        {
+            rmsBuf.copyFrom(0, 0, mainBuf, 0, scope.startIndex1, scope.blockSize1);
+            rmsBuf.copyFrom(1, 0, mainBuf, 1, scope.startIndex1, scope.blockSize1);
+        }
+        if (scope.blockSize2 > 0)
+        {
+            rmsBuf.copyFrom(0, scope.blockSize1, mainBuf, 0, scope.startIndex2, scope.blockSize2);
+            rmsBuf.copyFrom(1, scope.blockSize1, mainBuf, 1, scope.startIndex2, scope.blockSize2);
+        }
 
-        rmsL = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
+        peak = rmsBuf.getMagnitude(0, rmsBuf.getNumSamples());
+
+        rmsL = rmsBuf.getRMSLevel(0, 0, rmsBuf.getNumSamples());
         rmsR = rmsL;
-        if (buffer.getNumChannels() > 1)
-            rmsR = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
+        if (rmsBuf.getNumChannels() > 1)
+            rmsR = rmsBuf.getRMSLevel(1, 0, rmsBuf.getNumSamples());
 
-        if (rmsvec[0].size() > 0) {
+        if (rmsvec[0].size() > 0)
+        {
             rmsvec[0][lPtr] = rmsL * rmsL;
             rmsvec[1][rPtr] = rmsR * rmsR;
             lPtr = (lPtr + 1) % rmsvec[0].size();
             rPtr = (rPtr + 1) % rmsvec[1].size();
         }
-        else {
+        else
+        {
             sum[0] = rmsL * rmsL;
             sum[1] = rmsR * rmsR;
         }
@@ -88,26 +120,15 @@ struct VolumeMeterSource : Timer
         return std::sqrt(sum[ch]);
     }
 
-    inline float getPeak() { return peak; }
-
-    void setFlag(bool flag)
-    {
-        newBuf = flag;
-    }
-
-    bool getFlag() const
-    {
-        return newBuf;
-    }
-
-
-private:
+    float peak = 0.f;
     std::atomic<bool> newBuf = false, bufCopied = false;
-    AudioBuffer<float> buffer;
+private:
+    AbstractFifo fifo{1024};
+    AudioBuffer<float> mainBuf, rmsBuf;
+    int numSamplesToRead = 0;
 
     float rmsSize = 0.f;
     float rmsL = 0.f, rmsR = 0.f;
-    float peak = 0.f;
     std::vector<float> rmsvec[2];
     size_t lPtr = 0, rPtr = 0;
     std::atomic<float> sum[2];
@@ -131,20 +152,27 @@ struct VolumeMeterComponent : Component, Timer
 
     struct VolumeMeterLookAndFeel : LookAndFeel_V4
     {
-        VolumeMeterLookAndFeel(VolumeMeterComponent& comp) : owner(comp)
-        {}
+        VolumeMeterLookAndFeel(VolumeMeterComponent &comp) : owner(comp)
+        {
+        }
 
-        void setMeterType(Type newType) { type = newType;
-            if (type == Type::Reduction) lastPeak = 0.f; }
+        void setMeterType(Type newType)
+        {
+            type = newType;
+            if (type == Type::Reduction)
+                lastPeak = 0.f;
+        }
         void setMeterLayout(Layout newLayout) { layout = newLayout; }
         void setMeterColor(Colour newColor) { meterColor = newColor; }
 
-        void drawMeterBar(Graphics& g)
+        void drawMeterBar(Graphics &g)
         {
             switch (type)
             {
-            case Volume: {
-                if (owner.isMouseButtonDown() || owner.numTicks >= 300) {
+            case Volume:
+            {
+                if (owner.isMouseButtonDown() || owner.numTicks >= 150)
+                {
                     lastPeak = -90.f;
                     owner.numTicks = 0;
                 }
@@ -154,15 +182,15 @@ struct VolumeMeterComponent : Component, Timer
                 auto dbL = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -100.f);
                 auto dbR = Decibels::gainToDecibels(owner.source.getAvgRMS(1), -100.f);
 
-                auto peak = Decibels::gainToDecibels(owner.source.getPeak(), -100.f);
+                auto peak = Decibels::gainToDecibels(owner.source.peak, -100.f);
 
                 auto ob = owner.getLocalBounds().withTrimmedTop(owner.getHeight() * 0.1f);
 
                 g.fillRect(ob.getCentreX() - 1, ob.getY(), 2, ob.getHeight());
 
                 auto bounds = Rectangle<float>{(float)ob.getX(), (float)ob.getY() + 4.f,
-                                                (float)ob.getRight() - ob.getX(),
-                                                (float)ob.getBottom() - ob.getY() - 2.f};
+                                               (float)ob.getRight() - ob.getX(),
+                                               (float)ob.getBottom() - ob.getY() - 2.f};
 
                 bounds.reduce(4.f, 4.f);
 
@@ -204,8 +232,10 @@ struct VolumeMeterComponent : Component, Timer
                 }
                 break;
             }
-            case Reduction: {
-                if (owner.isMouseButtonDown() || owner.numTicks >= 300) {
+            case Reduction:
+            {
+                if (owner.isMouseButtonDown() || owner.numTicks >= 300)
+                {
                     owner.numTicks = 0;
                     lastPeak = 0.f;
                 }
@@ -213,11 +243,11 @@ struct VolumeMeterComponent : Component, Timer
                 g.setColour(meterColor);
 
                 auto db = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -60.f);
-                auto peak = Decibels::gainToDecibels(owner.source.getPeak(), -60.f);
+                auto peak = Decibels::gainToDecibels(owner.source.peak, -60.f);
 
                 auto ob = owner.getLocalBounds();
                 auto bounds = Rectangle<float>{ceilf(ob.getX()), ceilf(ob.getY()) + 1.f,
-                floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
+                                               floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
 
                 if (layout == Vertical)
                 {
@@ -235,7 +265,8 @@ struct VolumeMeterComponent : Component, Timer
 
                     g.drawFittedText("GR", Rectangle<int>(0, 0, 15, ob.getHeight()), Justification::centred, 1);
 
-                    if (peak < lastPeak) {
+                    if (peak < lastPeak)
+                    {
                         peak = jmax(peak, -21.f);
                         g.fillRect((bounds.getX() - peak * bounds.getWidth() / 24.f) + 20, 10.f, 2.f, (float)ob.getHeight() - 10.f);
                         lastPeak = peak;
@@ -243,7 +274,8 @@ struct VolumeMeterComponent : Component, Timer
                     else
                         g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / 24.f) + 20, 10.f, 2.f, (float)ob.getHeight() - 10.f);
 
-                    for (float i = 0; i <= bounds.getWidth(); i += bounds.getWidth() / 6.f) {
+                    for (float i = 0; i <= bounds.getWidth(); i += bounds.getWidth() / 6.f)
+                    {
                         if (i > 0)
                             g.fillRect(i + 19.f, 0.f, 2.f, 10.f);
                         g.setFont(8.f);
@@ -261,6 +293,7 @@ struct VolumeMeterComponent : Component, Timer
         }
 
         Type type;
+
     private:
         Layout layout;
         Colour meterColor;
@@ -276,11 +309,11 @@ struct VolumeMeterComponent : Component, Timer
     /**
      * @param v audio source for the meter
      * @param s parameter the meter may be attached to (like a compression param, for instance). Used for turning the display on/off
-    */
-    VolumeMeterComponent(VolumeMeterSource& v, std::atomic<float>* s = nullptr) : lnf(*this), source(v), state(s)
+     */
+    VolumeMeterComponent(VolumeMeterSource &v, std::atomic<float> *s = nullptr) : lnf(*this), source(v), state(s)
     {
         setLookAndFeel(&lnf);
-        startTimerHz(30);
+        startTimerHz(45);
     }
 
     ~VolumeMeterComponent() override
@@ -289,28 +322,30 @@ struct VolumeMeterComponent : Component, Timer
         stopTimer();
     }
 
-    void paint(Graphics& g) override
+    void paint(Graphics &g) override
     {
         lnf.drawMeterBar(g);
     }
 
     void timerCallback() override
     {
-        ++numTicks;
-
-        if (source.getFlag())
+        if (source.newBuf)
         {
-            source.setFlag(false);
+            source.newBuf = false;
             repaint(getLocalBounds());
+            ++numTicks;
         }
 
-        if (lnf.type == Type::Reduction) {
-            if (!*state && !anim.isAnimating(this)) {
+        if (lnf.type == Type::Reduction)
+        {
+            if (!*state && !anim.isAnimating(this))
+            {
                 anim.fadeOut(this, 500);
                 lastState = false;
                 setVisible(false);
             }
-            else if (*state && !anim.isAnimating(this) && !lastState) {
+            else if (*state && !anim.isAnimating(this) && !lastState)
+            {
                 anim.fadeIn(this, 500);
                 lastState = true;
             }
@@ -318,11 +353,12 @@ struct VolumeMeterComponent : Component, Timer
     }
 
     std::atomic<float> *getState() { return state; }
-    void setState(std::atomic<float>* newState) { state = newState; }
+    void setState(std::atomic<float> *newState) { state = newState; }
 
 protected:
     VolumeMeterSource &source;
     int numTicks = 0;
+
 private:
     VolumeMeterLookAndFeel lnf;
     std::atomic<float> *state;
