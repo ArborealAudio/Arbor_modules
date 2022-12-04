@@ -181,8 +181,6 @@ struct VolumeMeterComponent : Component, Timer
                     owner.numTicks = 0;
                 }
 
-                g.setColour(Colours::white);
-
                 auto dbL = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -100.f);
                 auto dbR = Decibels::gainToDecibels(owner.source.getAvgRMS(1), -100.f);
 
@@ -190,7 +188,8 @@ struct VolumeMeterComponent : Component, Timer
 
                 auto ob = owner.getLocalBounds().withTrimmedTop(owner.getHeight() * 0.1f);
 
-                g.fillRect(ob.getCentreX() - 1, ob.getY(), 2, ob.getHeight());
+                g.setColour(Colours::white);
+                g.fillRoundedRectangle((float)(ob.getCentreX() - 1), (float)ob.getY(), 2.f, (float)ob.getHeight(), 2.5f);
 
                 auto bounds = Rectangle<float>{(float)ob.getX(), (float)ob.getY() + 4.f,
                                                (float)ob.getRight() - ob.getX(),
