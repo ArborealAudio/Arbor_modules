@@ -12,8 +12,8 @@ struct VolumeMeterSource : Timer
     void prepare(const dsp::ProcessSpec &spec)
     {
         numSamplesToRead = spec.maximumBlockSize;
-        mainBuf.setSize(spec.numChannels, 44100);
-        rmsBuf.setSize(spec.numChannels, numSamplesToRead);
+        mainBuf.setSize(spec.numChannels, 44100, false, true, false);
+        rmsBuf.setSize(spec.numChannels, numSamplesToRead, false, true, false);
         fifo.setTotalSize(numSamplesToRead);
 
         rmsSize = (0.1f * spec.sampleRate) / (float)spec.maximumBlockSize;
@@ -41,12 +41,14 @@ struct VolumeMeterSource : Timer
         if (scope.blockSize1 > 0)
         {
             mainBuf.copyFrom(0, scope.startIndex1, _buffer, 0, 0, scope.blockSize1);
-            mainBuf.copyFrom(1, scope.startIndex1, _buffer, 1, 0, scope.blockSize1);
+            if (_buffer.getNumChannels() > 1)
+                mainBuf.copyFrom(1, scope.startIndex1, _buffer, 1, 0, scope.blockSize1);
         }
         if (scope.blockSize2 > 0)
         {
             mainBuf.copyFrom(0, scope.startIndex2, _buffer, 0, 0, scope.blockSize2);
-            mainBuf.copyFrom(1, scope.startIndex2, _buffer, 1, 0, scope.blockSize2);
+            if (_buffer.getNumChannels() > 1)
+                mainBuf.copyFrom(1, scope.startIndex2, _buffer, 1, 0, scope.blockSize2);
         }
         bufCopied = true;
     }
@@ -57,12 +59,14 @@ struct VolumeMeterSource : Timer
         if (scope.blockSize1 > 0)
         {
             rmsBuf.copyFrom(0, 0, mainBuf, 0, scope.startIndex1, scope.blockSize1);
-            rmsBuf.copyFrom(1, 0, mainBuf, 1, scope.startIndex1, scope.blockSize1);
+            if (mainBuf.getNumChannels() > 1)
+                rmsBuf.copyFrom(1, 0, mainBuf, 1, scope.startIndex1, scope.blockSize1);
         }
         if (scope.blockSize2 > 0)
         {
             rmsBuf.copyFrom(0, scope.blockSize1, mainBuf, 0, scope.startIndex2, scope.blockSize2);
-            rmsBuf.copyFrom(1, scope.blockSize1, mainBuf, 1, scope.startIndex2, scope.blockSize2);
+            if (mainBuf.getNumChannels() > 1)
+                rmsBuf.copyFrom(1, scope.blockSize1, mainBuf, 1, scope.startIndex2, scope.blockSize2);
         }
 
         peak = rmsBuf.getMagnitude(0, rmsBuf.getNumSamples());
