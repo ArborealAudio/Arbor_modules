@@ -1,4 +1,5 @@
 // VolumeMeter.h
+#pragma once
 
 struct VolumeMeterSource : Timer
 {
@@ -140,194 +141,181 @@ private:
 
 struct VolumeMeterComponent : Component, Timer
 {
-    enum Type
+    enum Flags
     {
-        Volume,
-        Reduction
+        Reduction = 1, // 0 - Volume | 1 - Reduction
+        Horizontal = 1 << 1, // 0 - Vertical | 1 - Horizontal
+        ClipIndicator = 1 << 2
     };
 
-    enum Layout
-    {
-        Vertical,
-        Horizontal
-    };
-
-    bool clipIndicator = false;
-
-    struct VolumeMeterLookAndFeel : LookAndFeel_V4
-    {
-        VolumeMeterLookAndFeel(VolumeMeterComponent &comp) : owner(comp)
-        {
-        }
-
-        void setMeterType(Type newType)
-        {
-            type = newType;
-            if (type == Type::Reduction)
-                lastPeak = 0.f;
-        }
-        void setMeterLayout(Layout newLayout) { layout = newLayout; }
-        void setMeterColor(Colour newColor) { meterColor = newColor; }
-
-        void drawMeterBar(Graphics &g)
-        {
-            switch (type)
-            {
-            case Volume:
-            {
-                if (owner.isMouseButtonDown() || owner.numTicks >= 150)
-                {
-                    lastPeak = -90.f;
-                    owner.numTicks = 0;
-                }
-
-                auto dbL = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -100.f);
-                auto dbR = Decibels::gainToDecibels(owner.source.getAvgRMS(1), -100.f);
-
-                auto peak = Decibels::gainToDecibels(owner.source.peak, -100.f);
-
-                auto ob = owner.getLocalBounds().withTrimmedTop(owner.getHeight() * 0.1f);
-
-                g.setColour(Colours::white);
-                g.fillRoundedRectangle((float)(ob.getCentreX() - 1), (float)ob.getY(), 2.f, (float)ob.getHeight(), 2.5f);
-
-                auto bounds = Rectangle<float>{(float)ob.getX(), (float)ob.getY() + 4.f,
-                                               (float)ob.getRight() - ob.getX(),
-                                               (float)ob.getBottom() - ob.getY() - 2.f};
-
-                bounds.reduce(4.f, 4.f);
-
-                /*RMS meter*/
-
-                Rectangle<float> rectL = bounds.withTop(bounds.getY() + jmax(dbL * bounds.getHeight() / -100.f, 0.f)).removeFromLeft(bounds.getWidth() / 2.f - 3.f);
-                Rectangle<float> rectR = bounds.withTop(bounds.getY() + jmax(dbR * bounds.getHeight() / -100.f, 0.f)).removeFromRight(bounds.getWidth() / 2.f - 3.f);
-
-                g.setColour(meterColor);
-
-                g.fillRect(rectL);
-                g.fillRect(rectR);
-
-                /*peak ticks*/
-
-                if (lastPeak > peak)
-                {
-                    if (lastPeak > 0.f && owner.clipIndicator)
-                        g.setColour(Colours::red);
-                    else
-                        g.setColour(Colours::white);
-
-                    g.drawHorizontalLine((int)bounds.getY() + jmax(lastPeak * bounds.getHeight() / -100.f, 0.f), bounds.getX(), bounds.getRight());
-
-                    g.drawFittedText(String(lastPeak, 1) + "dB", owner.getLocalBounds().removeFromTop(owner.getHeight() * 0.1f), Justification::centred, 1);
-                }
-                else
-                {
-                    if (peak > 0.f && owner.clipIndicator)
-                        g.setColour(Colours::red);
-                    else
-                        g.setColour(Colours::white);
-
-                    g.drawHorizontalLine((int)bounds.getY() + jmax(peak * bounds.getHeight() / -100.f, 0.f), bounds.getX(), bounds.getRight());
-
-                    g.drawFittedText(String(peak, 1) + "dB", owner.getLocalBounds().removeFromTop(owner.getHeight() * 0.1f), Justification::centred, 1);
-
-                    lastPeak = peak;
-                }
-                break;
-            }
-            case Reduction:
-            {
-                if (owner.isMouseButtonDown() || owner.numTicks >= 300)
-                {
-                    owner.numTicks = 0;
-                    lastPeak = 0.f;
-                }
-
-                g.setColour(meterColor);
-
-                auto db = Decibels::gainToDecibels(owner.source.getAvgRMS(0), -60.f);
-                auto peak = Decibels::gainToDecibels(owner.source.peak, -60.f);
-
-                auto ob = owner.getLocalBounds();
-                auto bounds = Rectangle<float>{ceilf(ob.getX()), ceilf(ob.getY()) + 1.f,
-                                               floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
-
-                if (layout == Vertical)
-                {
-                    Rectangle<float> rect = bounds.withBottom(bounds.getY() - db * bounds.getHeight() / 36.f);
-
-                    g.fillRect(rect.translated(0, 20));
-                    g.drawFittedText("GR", Rectangle<int>(0, 0, ob.getWidth(), 20), Justification::centred, 1);
-                }
-                else if (layout == Horizontal)
-                {
-                    db = jmax(db, -21.f);
-                    Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / 24.f).withTrimmedTop(10.f);
-
-                    g.fillRect(rect.translated(20, 0));
-
-                    g.drawFittedText("GR", Rectangle<int>(0, 0, 15, ob.getHeight()), Justification::centred, 1);
-
-                    if (peak < lastPeak)
-                    {
-                        peak = jmax(peak, -21.f);
-                        g.fillRect((bounds.getX() - peak * bounds.getWidth() / 24.f) + 20, 10.f, 2.f, (float)ob.getHeight() - 10.f);
-                        lastPeak = peak;
-                    }
-                    else
-                        g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / 24.f) + 20, 10.f, 2.f, (float)ob.getHeight() - 10.f);
-
-                    for (float i = 0; i <= bounds.getWidth(); i += bounds.getWidth() / 6.f)
-                    {
-                        if (i > 0)
-                            g.fillRect(i + 19.f, 0.f, 2.f, 10.f);
-                        g.setFont(8.f);
-                        g.drawFittedText(String((i / bounds.getWidth()) * 24.f), Rectangle<int>(i + 10, 0, 10, 10), Justification::centred, 1);
-                    }
-
-                    if (owner.getState() && !*owner.getState()) /*reset peak if comp is turned off*/
-                        lastPeak = 0.f;
-                }
-                break;
-            }
-            default:
-                return;
-            }
-        }
-
-        Type type;
-
-    private:
-        Layout layout;
-        Colour meterColor;
-        VolumeMeterComponent &owner;
-
-        float lastPeak = -90.f;
-    };
-
-    void setMeterType(Type newType) { lnf.setMeterType(newType); }
-    void setMeterLayout(Layout newLayout) { lnf.setMeterLayout(newLayout); }
-    void setMeterColor(Colour newColor) { lnf.setMeterColor(newColor); }
+    Colour meterColor;
 
     /**
      * @param v audio source for the meter
      * @param s parameter the meter may be attached to (like a compression param, for instance). Used for turning the display on/off
      */
-    VolumeMeterComponent(VolumeMeterSource &v, std::atomic<float> *s = nullptr) : lnf(*this), source(v), state(s)
+    VolumeMeterComponent(VolumeMeterSource &v, Flags f, std::atomic<float> *s = nullptr) : source(v), state(s), flags(f)
     {
-        setLookAndFeel(&lnf);
+        // setLookAndFeel(&lnf);
         startTimerHz(45);
     }
 
     ~VolumeMeterComponent() override
     {
-        setLookAndFeel(nullptr);
+        // setLookAndFeel(nullptr);
         stopTimer();
     }
 
     void paint(Graphics &g) override
     {
-        lnf.drawMeterBar(g);
+        switch (flags & Reduction)
+        {
+        case 0: // Volume
+        {
+            if (isMouseButtonDown() || numTicks >= 150)
+            {
+                lastPeak = -90.f;
+                numTicks = 0;
+            }
+
+            auto dbL = Decibels::gainToDecibels(source.getAvgRMS(0), -100.f);
+            auto dbR = Decibels::gainToDecibels(source.getAvgRMS(1), -100.f);
+
+            auto peak = Decibels::gainToDecibels(source.peak, -100.f);
+
+            auto ob = getLocalBounds().withTrimmedTop(getHeight() * 0.1f);
+
+            g.setColour(Colours::white);
+            g.fillRoundedRectangle((float)(ob.getCentreX() - 1), (float)ob.getY(), 2.f, (float)ob.getHeight(), 2.5f);
+
+            auto bounds = Rectangle<float>{(float)ob.getX(), (float)ob.getY() + 4.f,
+                                            (float)ob.getRight() - ob.getX(),
+                                            (float)ob.getBottom() - ob.getY() - 2.f};
+
+            bounds.reduce(4.f, 4.f);
+
+            /*RMS meter*/
+
+            Rectangle<float> rectL = bounds.withTop(bounds.getY() + jmax(dbL * bounds.getHeight() / -100.f, 0.f)).removeFromLeft(bounds.getWidth() / 2.f - 3.f);
+            Rectangle<float> rectR = bounds.withTop(bounds.getY() + jmax(dbR * bounds.getHeight() / -100.f, 0.f)).removeFromRight(bounds.getWidth() / 2.f - 3.f);
+
+            g.setColour(meterColor);
+
+            g.fillRect(rectL);
+            g.fillRect(rectR);
+
+            /*peak ticks*/
+
+            if (lastPeak > peak)
+            {
+                if (lastPeak > 0.f && (flags & ClipIndicator))
+                    g.setColour(Colours::red);
+                else
+                    g.setColour(Colours::white);
+
+                g.drawHorizontalLine((int)bounds.getY() + jmax(lastPeak * bounds.getHeight() / -100.f, 0.f), bounds.getX(), bounds.getRight());
+
+                g.drawFittedText(String(lastPeak, 1) + "dB", getLocalBounds().removeFromTop(getHeight() * 0.1f), Justification::centred, 1);
+            }
+            else
+            {
+                if (peak > 0.f && (flags & ClipIndicator))
+                    g.setColour(Colours::red);
+                else
+                    g.setColour(Colours::white);
+
+                g.drawHorizontalLine((int)bounds.getY() + jmax(peak * bounds.getHeight() / -100.f, 0.f), bounds.getX(), bounds.getRight());
+
+                g.drawFittedText(String(peak, 1) + "dB", getLocalBounds().removeFromTop(getHeight() * 0.1f), Justification::centred, 1);
+
+                lastPeak = peak;
+            }
+            break;
+        }
+        case 1: // Reduction
+        {
+            float maxDb = 24.f; // max dB the meter can display
+            float padding = 0.f; // padding for the "GR" label
+            if (isMouseButtonDown() || numTicks >= 150)
+            {
+                numTicks = 0;
+                lastPeak = 0.f;
+            }
+
+            g.setColour(meterColor);
+
+            auto db = Decibels::gainToDecibels(source.getAvgRMS(0), -60.f);
+            auto peak = Decibels::gainToDecibels(source.peak, -60.f);
+
+            auto ob = getLocalBounds();
+            auto bounds = Rectangle<float>{ceilf(ob.getX()), ceilf(ob.getY()) + 1.f,
+                                            floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
+
+            if (!(flags & Horizontal)) // Vertical
+            {
+                maxDb = 36.f;
+                padding = 15.f;
+                db = jmax(db, -maxDb + 3.f);
+                Rectangle<float> rect = bounds.withBottom(bounds.getY() - db * bounds.getHeight() / maxDb);
+
+                g.fillRect(rect.translated(0, padding));
+                g.drawFittedText("GR", Rectangle<int>(0, 0, ob.getWidth(), padding * 0.75f), Justification::centred, 1);
+
+                /* peak tick */
+                if (peak < lastPeak)
+                {
+                    peak = jmax(peak, -maxDb + 3.f);
+                    g.fillRect(bounds.getX(), (bounds.getY() - peak * bounds.getHeight() / maxDb) + padding, bounds.getWidth(), 2.f);
+                    lastPeak = peak;
+                }
+                else
+                    g.fillRect(bounds.getX(), (bounds.getY() - lastPeak * bounds.getHeight() / maxDb) + padding, bounds.getWidth(), 2.f);
+
+                /* meter scale ticks */
+                for (float i = 0; i <= bounds.getHeight(); i += bounds.getHeight() / 6.f)
+                {
+                    if (i > 0)
+                        g.fillRect(0.f, i + padding, 4.f, 2.f);
+                    g.setFont(8.f);
+                    g.drawFittedText(String((i / bounds.getHeight()) * maxDb), Rectangle<int>(0, i, 10, 10), Justification::centred, 1);
+                }
+            }
+            else // Horizontal
+            {
+                maxDb = 24.f;
+                padding = 20.f;
+                float topTrim = 10.f;
+                db = jmax(db, -maxDb + 3.f);
+                Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / maxDb).withTrimmedTop(topTrim);
+
+                g.fillRect(rect.translated(padding, 0));
+
+                g.drawFittedText("GR", Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
+
+                if (peak < lastPeak)
+                {
+                    peak = jmax(peak, -maxDb + 3.f);
+                    g.fillRect((bounds.getX() - peak * bounds.getWidth() / maxDb) + padding, topTrim, 2.f, (float)ob.getHeight() - topTrim);
+                    lastPeak = peak;
+                }
+                else
+                    g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb) + padding, topTrim, 2.f, (float)ob.getHeight() - topTrim);
+
+                for (float i = 0; i <= bounds.getWidth(); i += bounds.getWidth() / 6.f)
+                {
+                    if (i > 0)
+                        g.fillRect(i + 19.f, 0.f, 2.f, topTrim);
+                    g.setFont(8.f);
+                    g.drawFittedText(String((i / bounds.getWidth()) * maxDb), Rectangle<int>(i + 10, 0, 10, 10), Justification::centred, 1);
+                }
+            }
+            break;
+            if (getState() && !*getState()) /*reset peak if comp is turned off*/
+                lastPeak = 0.f;
+        }
+        default:
+            return;
+        }
     }
 
     void timerCallback() override
@@ -339,7 +327,7 @@ struct VolumeMeterComponent : Component, Timer
             ++numTicks;
         }
 
-        if (lnf.type == Type::Reduction)
+        if (flags & Reduction)
         {
             if (!*state && !anim.isAnimating(this))
             {
@@ -363,9 +351,11 @@ protected:
     int numTicks = 0;
 
 private:
-    VolumeMeterLookAndFeel lnf;
+    // VolumeMeterLookAndFeel lnf;
+    Flags flags;
     std::atomic<float> *state;
     bool lastState = false;
+    float lastPeak = 0.f;
 
     ComponentAnimator anim;
 };
