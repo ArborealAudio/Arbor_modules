@@ -1,4 +1,5 @@
 // ReleasePool.h
+#pragma once
 
 class ReleasePoolShared : Timer
 {

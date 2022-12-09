@@ -1,7 +1,7 @@
 /** Buffer.h
  * Custom class for xsimd-compatible buffers
  */
-
+#pragma once
 namespace buffer_clear
 {
 template <typename Type>

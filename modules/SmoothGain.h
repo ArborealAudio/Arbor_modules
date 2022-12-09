@@ -2,6 +2,7 @@
  * SmoothGain.h
  * Helpers for computing a smoothed gain on a block of audio samples
 */
+#pragma once
 
 template <typename T>
 struct SmoothGain

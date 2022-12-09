@@ -1,4 +1,5 @@
 // SVTFilter.h
+#pragma once
 
 enum class FilterType
 {

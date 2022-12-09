@@ -1,4 +1,5 @@
 // Delay.h
+#pragma once
 
 template <typename SampleType>
 class Delay
@@ -11,37 +12,37 @@ public:
     }
 
     /** Constructor. */
-    explicit Delay (int maximumDelayInSamples)
+    explicit Delay(int maximumDelayInSamples)
     {
-        jassert (maximumDelayInSamples >= 0);
+        jassert(maximumDelayInSamples >= 0);
 
         sampleRate = 44100.0;
 
-        setMaximumDelayInSamples (maximumDelayInSamples);
+        setMaximumDelayInSamples(maximumDelayInSamples);
     }
 
     //==============================================================================
     /** Sets the delay in samples. */
-    void setDelay (double newDelayInSamples)
+    void setDelay(double newDelayInSamples)
     {
-        auto upperLimit = (double) getMaximumDelayInSamples();
-        jassert (isPositiveAndNotGreaterThan (newDelayInSamples, upperLimit));
+        auto upperLimit = (double)getMaximumDelayInSamples();
+        jassert(isPositiveAndNotGreaterThan(newDelayInSamples, upperLimit));
 
-        delay     = jlimit ((double) 0, upperLimit, newDelayInSamples);
-        delayInt  = static_cast<int> (std::floor (delay));
-        delayFrac = delay - (double) delayInt;
+        delay = jlimit((double)0, upperLimit, newDelayInSamples);
+        delayInt = static_cast<int>(std::floor(delay));
+        delayFrac = delay - (double)delayInt;
 
         // updateInternalVariables();
     }
 
-    void setDelay (xsimd::batch<double> newDelayInSamples)
+    void setDelay(xsimd::batch<double> newDelayInSamples)
     {
-        auto upperLimit = (SampleType) getMaximumDelayInSamples();
-        jassert (isPositiveAndNotGreaterThan (newDelayInSamples, upperLimit));
+        auto upperLimit = (SampleType)getMaximumDelayInSamples();
+        jassert(isPositiveAndNotGreaterThan(newDelayInSamples, upperLimit));
 
         delay = xsimd::max((SampleType)0.0, xsimd::min(newDelayInSamples, upperLimit));
         delayInt = static_cast<int>(std::floor(delay));
-        delayFrac = delay - (SampleType) delayInt;
+        delayFrac = delay - (SampleType)delayInt;
     }
 
     /** Returns the current delay in samples. */
@@ -52,17 +53,17 @@ public:
 
     //==============================================================================
     /** Initialises the processor. */
-    void prepare (const dsp::ProcessSpec& spec)
+    void prepare(const dsp::ProcessSpec &spec)
     {
-        jassert (spec.numChannels > 0);
+        jassert(spec.numChannels > 0);
 
         // bufferData.setSize ((int) spec.numChannels, totalSize, false, false, true);
         bufferData.resize(spec.numChannels);
-        for (auto& buf : bufferData)
+        for (auto &buf : bufferData)
             buf.resize(totalSize);
 
-        writePos.resize (spec.numChannels);
-        readPos.resize  (spec.numChannels);
+        writePos.resize(spec.numChannels);
+        readPos.resize(spec.numChannels);
 
         sampleRate = spec.sampleRate;
 
@@ -75,12 +76,12 @@ public:
 
         This may allocate internally, so you should never call it from the audio thread.
     */
-    void setMaximumDelayInSamples (int maxDelayInSamples)
+    void setMaximumDelayInSamples(int maxDelayInSamples)
     {
-        jassert (maxDelayInSamples >= 0);
-        totalSize = jmax (4, maxDelayInSamples + 1);
+        jassert(maxDelayInSamples >= 0);
+        totalSize = jmax(4, maxDelayInSamples + 1);
         // bufferData.setSize ((int) bufferData.getNumChannels(), totalSize, false, false, true);
-        for (auto& buf : bufferData)
+        for (auto &buf : bufferData)
             buf.resize(totalSize);
         reset();
     }
@@ -90,15 +91,15 @@ public:
         For very short delay times, the result of getMaximumDelayInSamples() may
         differ from the last value passed to setMaximumDelayInSamples().
     */
-    int getMaximumDelayInSamples() const noexcept       { return totalSize - 1; }
+    int getMaximumDelayInSamples() const noexcept { return totalSize - 1; }
 
     /** Resets the internal state variables of the processor. */
     void reset()
     {
-        for (auto vec : { &writePos, &readPos })
-            std::fill (vec->begin(), vec->end(), 0);
+        for (auto vec : {&writePos, &readPos})
+            std::fill(vec->begin(), vec->end(), 0);
 
-        for (auto& buf : bufferData)
+        for (auto &buf : bufferData)
             std::fill(buf.begin(), buf.end(), 0.0);
     }
 
@@ -111,11 +112,11 @@ public:
 
         @see setDelay, popSample, process
     */
-    void pushSample (int channel, SampleType sample)
+    void pushSample(int channel, SampleType sample)
     {
         // bufferData.setSample (channel, writePos[(size_t) channel], sample);
         bufferData[channel][writePos[channel]] = sample;
-        writePos[(size_t) channel] = (writePos[(size_t) channel] + totalSize - 1) % totalSize;
+        writePos[(size_t)channel] = (writePos[(size_t)channel] + totalSize - 1) % totalSize;
     }
 
     /** Pops a single sample from one channel of the delay line.
@@ -135,19 +136,19 @@ public:
 
         @see setDelay, pushSample, process
     */
-    SampleType popSample (int channel, double delayInSamples = -1, bool updateReadPointer = true)
+    SampleType popSample(int channel, double delayInSamples = -1, bool updateReadPointer = true)
     {
         if (delayInSamples >= 0)
             setDelay(delayInSamples);
 
-        auto result = interpolateSample (channel);
+        auto result = interpolateSample(channel);
 
         if (updateReadPointer)
-            readPos[(size_t) channel] = (readPos[(size_t) channel] + totalSize - 1) % totalSize;
+            readPos[(size_t)channel] = (readPos[(size_t)channel] + totalSize - 1) % totalSize;
 
         return result;
     }
-    
+#if 0
     xsimd::batch<double> popSample (int channel, xsimd::batch<double> delayInSamples = -1, bool updateReadPointer = true)
     {
         if (xsimd::any(delayInSamples >= 0))
@@ -160,7 +161,7 @@ public:
 
         return result;
     }
-
+#endif
     //==============================================================================
     /** Processes the input and output samples supplied in the processing context.
 
@@ -170,23 +171,23 @@ public:
         @see setDelay
     */
     template <class Block>
-    void processBlock (Block& block) noexcept
+    void processBlock(Block &block) noexcept
     {
         const auto numChannels = block.getNumChannels();
-        const auto numSamples  = block.getNumSamples();
+        const auto numSamples = block.getNumSamples();
 
-        jassert (block.getNumChannels() == numChannels);
-        jassert (block.getNumChannels() == writePos.size());
-        jassert (block.getNumSamples()  == numSamples);
+        jassert(block.getNumChannels() == numChannels);
+        jassert(block.getNumChannels() == writePos.size());
+        jassert(block.getNumSamples() == numSamples);
 
         for (size_t channel = 0; channel < numChannels; ++channel)
         {
-            auto* in = block.getChannelPointer (channel);
+            auto *in = block.getChannelPointer(channel);
 
             for (size_t i = 0; i < numSamples; ++i)
             {
-                pushSample ((int) channel, in[i]);
-                in[i] = popSample ((int) channel);
+                pushSample((int)channel, in[i]);
+                in[i] = popSample((int)channel);
             }
         }
     }
@@ -194,9 +195,9 @@ public:
 private:
     //==============================================================================
 
-    SampleType interpolateSample (int channel) const
+    SampleType interpolateSample(int channel) const
     {
-        auto index1 = readPos[(size_t) channel] + delayInt;
+        auto index1 = readPos[(size_t)channel] + delayInt;
         auto index2 = index1 + 1;
 
         if (index2 >= totalSize)

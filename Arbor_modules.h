@@ -34,6 +34,7 @@ using namespace juce;
 #include "modules/SVTFilter.h"
 #include "modules/LRFilter.h"
 #include "modules/ReleasePool.h"
+// #include "modules/Thread.h"
 #include "modules/Delay.h"
 #include "modules/Parameter.h"
 #include "modules/SmoothGain.h"

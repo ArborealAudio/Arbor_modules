@@ -2,6 +2,7 @@
  * FastMath.h
  * Fast math functions for faster math
 */
+#pragma once
 
 template <typename T>
 T fast_tanh(T x)
