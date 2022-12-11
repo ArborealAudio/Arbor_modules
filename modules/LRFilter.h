@@ -29,9 +29,9 @@ public:
     }
 
     /** Sets the cutoff frequency of the filter in Hz. */
-    void setCutoffFrequency (SampleType newCutoffFrequencyHz)
+    void setCutoffFrequency (float newCutoffFrequencyHz)
     {
-        jassert (isPositiveAndBelow (newCutoffFrequencyHz, static_cast<SampleType> (sampleRate * 0.5)));
+        jassert (isPositiveAndBelow (newCutoffFrequencyHz, static_cast<float> (sampleRate * 0.5)));
 
         cutoffFrequency = newCutoffFrequencyHz;
         update();
