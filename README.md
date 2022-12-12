@@ -10,3 +10,9 @@ Includes a few useful utilities as well, like:
  - Smooth Gain helpers
  - A worker thread class (Chat GPT-generated, doens't currently compile L.o.L)
  - A volume meter component not exactly fit for plug-and-play usage
+
+## License
+
+Arbor_modules is provided under the GPLv3 license
+
+xsimd is licensed under the BSD-3-clause license
