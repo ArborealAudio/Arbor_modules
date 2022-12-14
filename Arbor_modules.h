@@ -1,4 +1,7 @@
-// Arbor_modules.h
+/** Copyright 2022 Alex Riccio
+
+Arbor_modules.h */
+
 /***
 BEGIN_JUCE_MODULE_DECLARATION
 ID: Arbor_modules
