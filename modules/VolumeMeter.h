@@ -141,12 +141,13 @@ private:
 
 struct VolumeMeterComponent : Component, Timer
 {
-    enum Flags
+    enum
     {
         Reduction = 1, // 0 - Volume | 1 - Reduction
         Horizontal = 1 << 1, // 0 - Vertical | 1 - Horizontal
         ClipIndicator = 1 << 2
     };
+    typedef uint8_t flags_t;
 
     Colour meterColor;
 
@@ -154,7 +155,7 @@ struct VolumeMeterComponent : Component, Timer
      * @param v audio source for the meter
      * @param s parameter the meter may be attached to (like a compression param, for instance). Used for turning the display on/off
      */
-    VolumeMeterComponent(VolumeMeterSource &v, Flags f, std::atomic<float> *s = nullptr) : source(v), state(s), flags(f)
+    VolumeMeterComponent(VolumeMeterSource &v, flags_t f, std::atomic<float> *s = nullptr) : source(v), state(s), flags(f)
     {
         // setLookAndFeel(&lnf);
         startTimerHz(45);
@@ -272,13 +273,13 @@ struct VolumeMeterComponent : Component, Timer
                     g.fillRect(bounds.getX(), (bounds.getY() - lastPeak * bounds.getHeight() / maxDb) + padding, bounds.getWidth(), 2.f);
 
                 /* meter scale ticks */
-                for (float i = 0; i <= bounds.getHeight(); i += bounds.getHeight() / 6.f)
-                {
-                    if (i > 0)
-                        g.fillRect(0.f, i + padding, 4.f, 2.f);
-                    g.setFont(8.f);
-                    g.drawFittedText(String((i / bounds.getHeight()) * maxDb), Rectangle<int>(0, i, 10, 10), Justification::centred, 1);
-                }
+                // for (float i = 0; i <= bounds.getHeight(); i += bounds.getHeight() / 6.f)
+                // {
+                //     if (i > 0)
+                //         g.fillRect(0.f, i + padding, 4.f, 2.f);
+                //     g.setFont(8.f);
+                //     g.drawFittedText(String((i / bounds.getHeight()) * maxDb), Rectangle<int>(0, i, 10, 10), Justification::centred, 1);
+                // }
             }
             else // Horizontal
             {
@@ -352,7 +353,7 @@ protected:
 
 private:
     // VolumeMeterLookAndFeel lnf;
-    Flags flags;
+    flags_t flags;
     std::atomic<float> *state;
     bool lastState = false;
     float lastPeak = 0.f;
