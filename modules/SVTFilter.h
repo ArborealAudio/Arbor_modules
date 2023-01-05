@@ -101,6 +101,14 @@ public:
         }
     }
 
+    void processChannel(T *in, size_t ch, size_t numSamples)
+    {
+        for (size_t i = 0; i < numSamples; ++i)
+        {
+            in[i] = processSample(ch, in[i]);
+        }
+    }
+
     T processSample(size_t channel, T in)
     {
         assert(s1.size() > channel && s1.size() > 0);
