@@ -1,8 +1,9 @@
 /**
  * SmoothGain.h
- * Helpers for computing a smoothed gain on a block of audio samples
+ * Helpers for computing a smoothed gain on a block of audio samples, or for processing a crossfade btw audio blocks
 */
-#pragma once
+#ifndef SMOOTHGAIN_H
+#define SMOOTHGAIN_H
 
 template <typename T>
 struct SmoothGain
@@ -60,3 +61,31 @@ struct SmoothGain
             lastGain = currentGain;
     }
 };
+
+/**
+ * A struct for doing smooth crossfades between processed and un-processed audio
+*/
+struct Crossfade
+{
+    template <typename T>
+    inline static void process(const T* dryIn, T* out, size_t numSamples)
+    {
+        float gain = 0.f;
+        float inc = 1.f / (float)numSamples;
+        for (size_t i = 0; i < numSamples; ++i)
+        {
+            out[i] = (out[i] * gain) + (1.f - gain) * dryIn[i];
+            gain += inc;
+        }
+    }
+
+    template <typename Block>
+    inline static void process(const Block &dryBlock, Block &outBlock)
+    {
+        for (size_t ch = 0; ch < outBlock.getNumChannels(); ++ch)
+        {
+            process(dryBlock.getChannelPointer(ch), outBlock.getChannelPointer(ch), outBlock.getNumSamples());
+        }
+    }
+};
+#endif
