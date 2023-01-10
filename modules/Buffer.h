@@ -21,6 +21,23 @@ std::enable_if_t<std::is_same_v<Type, xsimd::batch<double>>, void>
     }
 }
 
+/**
+ * Debug macro
+ * checks a buffer of samples or audio block for NaNs
+ * will simply assert if it finds a NaN
+*/
+#if DEBUG
+    #define CHECK_BUFFER(in, numSamples) {for (size_t i = 0; i < numSamples; ++i) \
+    assert(!std::isnan(in[i]));}
+    #define CHECK_BLOCK(block) \
+    { auto L = block.getChannelPointer(0); \
+    CHECK_BUFFER(L, block.getNumSamples()) \
+    if (block.getNumChannels() > 1) \
+    { auto R = block.getChannelPointer(1); CHECK_BUFFER(R, block.getNumSamples()) } }
+#else
+    #define CHECK_BUFFER(a, b)
+    #define CHECK_BLOCK(a)
+#endif
 
 template <typename Type>
 class Buffer
