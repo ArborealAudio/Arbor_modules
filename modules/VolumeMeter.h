@@ -305,13 +305,14 @@ struct VolumeMeterComponent : Component, Timer
                 else
                     g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb) + padding, topTrim, 2.f, (float)ob.getHeight() - topTrim);
 
-                /** ticks & numbers PROBLEM: they are about 1db short of what they should be */
-                for (float i = 0; i <= bounds.getWidth(); i += bounds.getWidth() / 6.f)
+                /** ticks & numbers */
+                const int nWidth = bounds.getWidth() - padding;
+                for (float i = 0; i <= bounds.getRight(); i += nWidth / 6.f)
                 {
                     if (i > 0)
-                        g.fillRect(i - 1, 0.f, 2.f, topTrim);
+                        g.fillRect(i + padding - 1, 0.f, 2.f, topTrim);
                     g.setFont(8.f);
-                    g.drawFittedText(String(static_cast<int>(((i - padding) / bounds.getWidth()) * maxDb)), Rectangle<int>(i, 0, (int)topTrim, (int)topTrim), Justification::centred, 1);
+                    g.drawFittedText(String(static_cast<int>((i / nWidth) * maxDb)), Rectangle<int>(i + padding, 0, (int)topTrim, (int)topTrim), Justification::centred, 1);
                 }
             }
             break;
