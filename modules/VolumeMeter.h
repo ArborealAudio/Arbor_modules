@@ -284,14 +284,17 @@ struct VolumeMeterComponent : Component, Timer
             else // Horizontal
             {
                 maxDb = 24.f;
-                padding = 20.f;
+                padding = 20.f; // space for GR label
                 float topTrim = 10.f;
                 db = jmax(db, -maxDb + 3.f);
                 Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / maxDb).withTrimmedTop(topTrim);
 
                 g.fillRect(rect.translated(padding, 0));
 
-                g.drawFittedText("GR", Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
+                g.setColour(Colours::red);
+                g.drawFittedText(String(std::abs(db), 1), Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
+                g.setColour(Colours::antiquewhite);
+                // g.drawFittedText("GR", Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
 
                 if (peak < lastPeak)
                 {
@@ -302,12 +305,13 @@ struct VolumeMeterComponent : Component, Timer
                 else
                     g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb) + padding, topTrim, 2.f, (float)ob.getHeight() - topTrim);
 
+                /** ticks & numbers PROBLEM: they are about 1db short of what they should be */
                 for (float i = 0; i <= bounds.getWidth(); i += bounds.getWidth() / 6.f)
                 {
                     if (i > 0)
-                        g.fillRect(i + 19.f, 0.f, 2.f, topTrim);
+                        g.fillRect(i - 1, 0.f, 2.f, topTrim);
                     g.setFont(8.f);
-                    g.drawFittedText(String((i / bounds.getWidth()) * maxDb), Rectangle<int>(i + 10, 0, 10, 10), Justification::centred, 1);
+                    g.drawFittedText(String(static_cast<int>(((i - padding) / bounds.getWidth()) * maxDb)), Rectangle<int>(i, 0, (int)topTrim, (int)topTrim), Justification::centred, 1);
                 }
             }
             break;
