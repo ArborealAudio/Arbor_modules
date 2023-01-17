@@ -289,30 +289,30 @@ struct VolumeMeterComponent : Component, Timer
                 db = jmax(db, -maxDb + 3.f);
                 Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / maxDb).withTrimmedTop(topTrim);
 
-                g.fillRect(rect.translated(padding, 0));
+                g.fillRect(rect);
 
-                g.setColour(Colours::red);
-                g.drawFittedText(String(std::abs(db), 1), Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
-                g.setColour(Colours::antiquewhite);
+                // g.setColour(Colours::red);
+                // g.drawFittedText(String((int)std::abs(lastPeak)), Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
+                // g.setColour(Colours::antiquewhite);
                 // g.drawFittedText("GR", Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
 
                 if (peak < lastPeak)
                 {
                     peak = jmax(peak, -maxDb + 3.f);
-                    g.fillRect((bounds.getX() - peak * bounds.getWidth() / maxDb) + padding, topTrim, 2.f, (float)ob.getHeight() - topTrim);
+                    g.fillRect((bounds.getX() - peak * bounds.getWidth() / maxDb)/*  + padding */, topTrim, 2.f, (float)ob.getHeight() - topTrim);
                     lastPeak = peak;
                 }
                 else
-                    g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb) + padding, topTrim, 2.f, (float)ob.getHeight() - topTrim);
+                    g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb)/*  + padding */, topTrim, 2.f, (float)ob.getHeight() - topTrim);
 
-                /** ticks & numbers */
-                const int nWidth = bounds.getWidth() - padding;
+                /* ticks & numbers */
+                const float nWidth = bounds.getWidth()/*  - padding */;
                 for (float i = 0; i <= bounds.getRight(); i += nWidth / 6.f)
                 {
-                    if (i > 0)
-                        g.fillRect(i + padding - 1, 0.f, 2.f, topTrim);
-                    g.setFont(8.f);
-                    g.drawFittedText(String(static_cast<int>((i / nWidth) * maxDb)), Rectangle<int>(i + padding, 0, (int)topTrim, (int)topTrim), Justification::centred, 1);
+                    g.setFont(topTrim);
+                    String str = "| ";
+                    str.append(String(static_cast<int>((i / nWidth) * maxDb)), 2);
+                    g.drawText(str, Rectangle<int>(i - 1, 0, (int)topTrim + 5, (int)topTrim), Justification::centred);
                 }
             }
             break;
