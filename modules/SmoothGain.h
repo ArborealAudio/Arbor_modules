@@ -68,24 +68,61 @@ struct SmoothGain
 struct Crossfade
 {
     template <typename T>
-    inline static void process(const T* dryIn, T* out, size_t numSamples)
+    inline static void process(const T *dryIn, T *out, size_t numSamples, float startGain = 0.f, float endGain = 1.f)
     {
-        float gain = 0.f;
-        float inc = 1.f / (float)numSamples;
+        float inc = (endGain - startGain) / (float)numSamples;
         for (size_t i = 0; i < numSamples; ++i)
         {
-            out[i] = (out[i] * gain) + (1.f - gain) * dryIn[i];
-            gain += inc;
+            out[i] = (out[i] * startGain) + (1.f - startGain) * dryIn[i];
+            startGain += inc;
+        }
+    }
+
+    // fades from dry to wet, optionally with a custom gain ramp
+    template <typename T>
+    inline static void process(const AudioBuffer<T> &dry, AudioBuffer<T> &wet, float startGain = 0.f, float endGain = 1.f)
+    {
+        assert(dry.getNumSamples() == wet.getNumSamples());
+        for (size_t ch = 0; ch < dry.getNumChannels(); ++ch)
+        {
+            process(dry.getReadPointer(ch), wet.getWritePointer(ch), dry.getNumSamples(), startGain, endGain);
         }
     }
 
     template <typename Block>
     inline static void process(const Block &dryBlock, Block &outBlock)
     {
+        assert(dryBlock.getNumSamples() == outBlock.getNumSamples());
         for (size_t ch = 0; ch < outBlock.getNumChannels(); ++ch)
         {
             process(dryBlock.getChannelPointer(ch), outBlock.getChannelPointer(ch), outBlock.getNumSamples());
         }
+    }
+
+    bool complete = false;
+    float fadeTimeSec = 1.f;
+    int fadeLengthSamples = 0;
+    float startGain, endGain = 0.f;
+
+    void setFadeTime(float sampleRate, float newFadeTimeSec)
+    {
+        fadeTimeSec = newFadeTimeSec;
+        fadeLengthSamples = sampleRate * newFadeTimeSec;
+        startGain = 0.f;
+        complete = false;
+    }
+
+    template <typename T>
+    inline void processWithState(const AudioBuffer<T> &dry, AudioBuffer<T> &wet)
+    {
+        if (complete)
+            return;
+        auto numSamples = dry.getNumSamples();
+        endGain = startGain + (1.f / (fadeLengthSamples / numSamples));
+        process(dry, wet, startGain, endGain);
+        startGain = endGain;
+        if (endGain >= 1.f)
+            complete = true;
     }
 };
 #endif
