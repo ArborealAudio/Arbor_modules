@@ -80,12 +80,11 @@ struct Crossfade
 
     // fades from dry to wet, optionally with a custom gain ramp
     template <typename T>
-    inline static void process(const AudioBuffer<T> &dry, AudioBuffer<T> &wet, float startGain = 0.f, float endGain = 1.f)
+    inline static void process(const AudioBuffer<T> &dry, AudioBuffer<T> &wet, size_t numSamples, float startGain = 0.f, float endGain = 1.f)
     {
-        assert(dry.getNumSamples() == wet.getNumSamples());
         for (size_t ch = 0; ch < dry.getNumChannels(); ++ch)
         {
-            process(dry.getReadPointer(ch), wet.getWritePointer(ch), dry.getNumSamples(), startGain, endGain);
+            process(dry.getReadPointer(ch), wet.getWritePointer(ch), numSamples, startGain, endGain);
         }
     }
 
@@ -113,11 +112,10 @@ struct Crossfade
     }
 
     template <typename T>
-    inline void processWithState(const AudioBuffer<T> &dry, AudioBuffer<T> &wet)
+    inline void processWithState(const AudioBuffer<T> &dry, AudioBuffer<T> &wet, size_t numSamples)
     {
         if (complete)
             return;
-        auto numSamples = dry.getNumSamples();
         endGain = startGain + (1.f / (fadeLengthSamples / numSamples));
         process(dry, wet, startGain, endGain);
         startGain = endGain;
