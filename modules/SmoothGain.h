@@ -117,7 +117,7 @@ struct Crossfade
         if (complete)
             return;
         endGain = startGain + (1.f / (fadeLengthSamples / numSamples));
-        process(dry, wet, startGain, endGain);
+        process(dry, wet, numSamples, startGain, endGain);
         startGain = endGain;
         if (endGain >= 1.f)
             complete = true;
