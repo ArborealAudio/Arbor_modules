@@ -15,19 +15,20 @@ struct SmoothGain
     template <typename FloatType>
     inline static void applySmoothGain(T *in, size_t numSamples, FloatType currentGain, FloatType& lastGain, bool updateGain = true)
     {
-        if (lastGain == currentGain)
+        auto endGain = lastGain;
+        if (endGain == currentGain)
         {
             for (size_t i = 0; i < numSamples; ++i)
-                in[i] *= lastGain;
+                in[i] *= endGain;
             return;
         }
 
-        auto inc = (currentGain - lastGain) / numSamples;
+        auto inc = (currentGain - endGain) / numSamples;
         
         for (size_t i = 0; i < numSamples; ++i)
         {
-            in[i] *= lastGain;
-            lastGain += inc;
+            in[i] *= endGain;
+            endGain += inc;
         }
 
         if (updateGain)
@@ -41,20 +42,21 @@ struct SmoothGain
     template <typename Block, typename FloatType>
     inline static void applySmoothGain(Block& block, FloatType currentGain, FloatType& lastGain, bool updateGain = true)
     {
-        if (lastGain == currentGain)
+        auto endGain = lastGain;
+        if (endGain == currentGain)
         {
-            block.multiplyBy(lastGain);
+            block.multiplyBy(endGain);
             return;
         }
 
-        auto inc = (currentGain - lastGain) / block.getNumSamples();
+        auto inc = (currentGain - endGain) / block.getNumSamples();
 
         for (size_t i = 0; i < block.getNumSamples(); ++i)
         {
             for (size_t ch = 0; ch < block.getNumChannels(); ++ch)
-                block.getChannelPointer(ch)[i] *= (T)lastGain;
+                block.getChannelPointer(ch)[i] *= (T)endGain;
             
-            lastGain += inc;
+            endGain += inc;
         }
 
         if (updateGain)
