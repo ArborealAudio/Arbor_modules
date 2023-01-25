@@ -89,12 +89,11 @@ struct Crossfade
     }
 
     template <typename Block>
-    inline static void process(const Block &dryBlock, Block &outBlock)
+    inline static void process(const Block &dryBlock, Block &outBlock, size_t numSamples, float startGain = 0.f, float endGain = 1.f)
     {
-        assert(dryBlock.getNumSamples() == outBlock.getNumSamples());
         for (size_t ch = 0; ch < outBlock.getNumChannels(); ++ch)
         {
-            process(dryBlock.getChannelPointer(ch), outBlock.getChannelPointer(ch), outBlock.getNumSamples());
+            process(dryBlock.getChannelPointer(ch), outBlock.getChannelPointer(ch), numSamples, startGain, endGain);
         }
     }
 
@@ -113,6 +112,18 @@ struct Crossfade
 
     template <typename T>
     inline void processWithState(const AudioBuffer<T> &dry, AudioBuffer<T> &wet, size_t numSamples)
+    {
+        if (complete)
+            return;
+        endGain = startGain + (1.f / (fadeLengthSamples / numSamples));
+        process(dry, wet, numSamples, startGain, endGain);
+        startGain = endGain;
+        if (endGain >= 1.f)
+            complete = true;
+    }
+
+    template <typename Block>
+    inline void processWithState(const Block &dry, Block &wet, size_t numSamples)
     {
         if (complete)
             return;
