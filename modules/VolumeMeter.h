@@ -315,9 +315,9 @@ struct VolumeMeterComponent : Component, Timer
                     g.drawText(str, Rectangle<int>(i - 1, 0, (int)topTrim + 5, (int)topTrim), Justification::centred);
                 }
             }
-            break;
             if (getState() && !*getState()) /*reset peak if comp is turned off*/
                 lastPeak = 0.f;
+            break;
         }
         default:
             return;
