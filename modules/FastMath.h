@@ -28,6 +28,19 @@ inline T tanh(T x)
 
 template <typename T>
 #if USE_SIMD
+inline T atan(T x)
+{
+    return xsimd::atan(x);
+}
+#else
+inline T atan(T x)
+{
+    return std::atan(x);
+}
+#endif
+
+template <typename T>
+#if USE_SIMD
 inline T abs(T x)
 {
     return xsimd::abs(x);
