@@ -50,7 +50,6 @@ struct DownloadManager : Component
     {
         if (!force)
         {
-            auto lastCheck = readConfigFileString("updateCheck").getLargeIntValue();
             auto dayAgo = Time::getCurrentTime() - RelativeTime::hours(24);
             if (lastCheck > dayAgo.toMilliseconds())
             {
@@ -95,8 +94,6 @@ struct DownloadManager : Component
         }
         else
             updateAvailable = false;
-
-        // writeConfigFileString("updateCheck", String(Time::currentTimeMillis()));
 
         MessageManager::callAsync([&]
                                   { onUpdateCheck(updateAvailable); });

@@ -5,9 +5,10 @@
 
 #pragma once
 
-static void writeConfigFile(const String &property, int value)
+/** @param configPath path RELATIVE to user app data dir */
+static void writeConfigFile(const String configPath, const String &property, int value)
 {
-    File config{File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "/Arboreal Audio/Gamma/config.xml"};
+    File config{File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + configPath};
     if (!config.existsAsFile())
         config.create();
 
@@ -24,9 +25,10 @@ static void writeConfigFile(const String &property, int value)
     xml->writeTo(config);
 }
 
-static void writeConfigFileString(const String &property, const String &value)
+/** @param configPath path RELATIVE to user app data dir */
+static void writeConfigFileString(const String configPath, const String &property, const String &value)
 {
-    File config{File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "/Arboreal Audio/Gamma/config.xml"};
+    File config{File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + configPath};
     if (!config.existsAsFile())
         config.create();
 
@@ -40,10 +42,11 @@ static void writeConfigFileString(const String &property, const String &value)
     xml->writeTo(config);
 }
 
-/*returns integer value of read property, or -1 if it doesn't exist*/
-static int readConfigFile(const String &property)
+/** @param configPath path RELATIVE to user app data dir
+ * @brief returns integer value of read property, or -1 if it doesn't exist*/
+static int readConfigFile(const String configPath, const String &property)
 {
-    File config{File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "/Arboreal Audio/Gamma/config.xml"};
+    File config{File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + configPath};
     if (!config.existsAsFile())
         return -1;
 
@@ -56,9 +59,10 @@ static int readConfigFile(const String &property)
     return -1;
 }
 
-static String readConfigFileString(const String &property)
+/** @param configPath path RELATIVE to user app data dir */
+static String readConfigFileString(const String configPath, const String &property)
 {
-    File config{File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "/Arboreal Audio/Gamma/config.xml"};
+    File config{File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + configPath};
     if (!config.existsAsFile())
         return "";
 
