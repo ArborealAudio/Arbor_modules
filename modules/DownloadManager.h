@@ -5,35 +5,6 @@
 
 #pragma once
 
-// const String versionURL
-// #if PRODUCTION_BUILD
-//     {"https://arborealaudio.com/versions/Gamma-latest.json"};
-// #else
-//     {"https://arborealaudio.com/versions/test/Gamma-latest.json"};
-// #endif
-
-// /* these can function as a sort of "dummy" endpoint which we can redirect to AWS */
-// const String downloadURL
-// #if JUCE_WINDOWS
-//     {"https://arborealaudio.com/downloads/Gamma-windows.exe"};
-// #elif JUCE_MAC
-//     {"https://arborealaudio.com/downloads/Gamma-mac.dmg"};
-// #elif JUCE_LINUX
-//     {"https://arborealaudio.com/downloads/Gamma-linux.tar.gz"};
-// #endif
-
-// const String downloadPath
-// {
-//     "~/Downloads/"
-// #if JUCE_WINDOWS
-//     "Gamma-windows.exe"
-// #elif JUCE_MAC
-//     "Gamma-mac.dmg"
-// #elif JUCE_LINUX
-//     "Gamma-linux.tar.gz"
-// #endif
-// };
-
 struct DownloadManager : Component
 {
     DownloadManager(const String _curVersion,
