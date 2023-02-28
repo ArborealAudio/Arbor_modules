@@ -38,4 +38,7 @@ using namespace juce;
 #include "modules/Parameter.h"
 #include "modules/SmoothGain.h"
 #include "modules/StereoImaging.h"
+#include "modules/LiteThread.h"
+#include "modules/Config.h"
+#include "modules/DownloadManager.h"
 }
