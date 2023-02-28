@@ -1,10 +1,14 @@
-/**
- * DownloadManager.h
- * What it sounds like. Depends on gin's DownloadManager
-*/
 
 #pragma once
 
+/**
+ * DownloadManager.h
+ * What it sounds like. Depends on gin's DownloadManager
+ * 
+ * Expects a macro PRODUCTION_BUILD to be true, or else
+ * for debug purposes will always return that an update
+ * is available
+*/
 struct DownloadManager : Component
 {
     DownloadManager(const String _curVersion,
@@ -46,7 +50,7 @@ struct DownloadManager : Component
     }
 
     /** @param force whether to force the check even if checked < 24hrs ago */
-    void checkForUpdate(bool force = false)
+    void checkForUpdate(bool force = false, uint64_t lastCheck = 0)
     {
         if (!force)
         {
