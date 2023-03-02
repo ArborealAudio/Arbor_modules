@@ -27,7 +27,8 @@ struct LiteThread : Thread
 
     void run() override
     {
-        while (!threadShouldExit())
+        bool working = true;
+        while (!threadShouldExit() && working)
         {
             if (!jobs.empty())
             {
@@ -36,8 +37,10 @@ struct LiteThread : Thread
                 job();
                 jobCount += 1;
                 if (jobCount >= jobLimit && jobLimit > -1)
-                    signalThreadShouldExit();
+                    working = false;
             }
+            else if (jobCount >= jobLimit && jobLimit > -1)
+                working = false;
             else
                 wait(100);
         }
