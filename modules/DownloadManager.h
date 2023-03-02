@@ -1,6 +1,14 @@
 
 #pragma once
 
+/** @brief struct to hold data about an update check */
+struct UpdateResult
+{
+    bool updateAvailable; // is an update avaiable?
+    // const char *updateURL; // url to retrieve the update at
+    String changes; // comma-separated list of changes
+};
+
 /**
  * DownloadManager.h
  * What it sounds like. Depends on gin's DownloadManager
@@ -11,13 +19,9 @@
 */
 struct DownloadManager : Component
 {
-    DownloadManager(const String _curVersion,
-                    const String _versionURL,
-                    const String _downloadURL,
-                    const String _downloadPath) : currentVersion(_curVersion),
-                                                  versionURL(_versionURL),
-                                                  downloadURL(_downloadURL),
-                                                  downloadPath(_downloadPath)
+    DownloadManager(const char *_downloadURL,
+                    const char *_downloadPath) : downloadURL(_downloadURL),
+                                                 downloadPath(_downloadPath)
     {
         addAndMakeVisible(yes);
         addAndMakeVisible(no);
@@ -26,7 +30,7 @@ struct DownloadManager : Component
         {
             if (!isDownloading)
             {
-                onUpdateCheck(false);
+                setVisible(false);
             }
             else
             {
@@ -50,23 +54,31 @@ struct DownloadManager : Component
     }
 
     /** @param force whether to force the check even if checked < 24hrs ago */
-    void checkForUpdate(bool force = false, uint64_t lastCheck = 0)
+    static UpdateResult checkForUpdate(const String &currentVersion, const String &versionURL, bool force = false, int64 lastCheck = 0)
     {
+        UpdateResult result;
         if (!force)
         {
             auto dayAgo = Time::getCurrentTime() - RelativeTime::hours(24);
             if (lastCheck > dayAgo.toMilliseconds())
             {
-                MessageManager::callAsync([&]
-                                          { onUpdateCheck(false); });
-                return;
+                // MessageManager::callAsync([&]
+                //                           { onUpdateCheck(false); });
+                result.updateAvailable = false;
+                return result;
             }
         }
 
-        if (auto stream = URL(versionURL).createInputStream(URL::InputStreamOptions(URL::ParameterHandling::inAddress)))
+        auto stream = WebInputStream(URL(versionURL), false);
+        auto connected = stream.connect(nullptr);
+        auto size = stream.getTotalLength();
+        if (connected && !stream.isError() && size > 0)
         {
-            auto data = JSON::parse(stream->readEntireStreamAsString());
-
+            char *buf = (char*)malloc(sizeof(char) * size);
+            auto bytesRead = stream.read(buf, size);
+            /** @PROBLEM: This apparently often throws exceptions */
+            auto data = JSON::parse(String(CharPointer_UTF8(buf)));
+            free(buf);
             auto changesObj = data.getProperty("changes", var());
             if (changesObj.isArray())
             {
@@ -77,30 +89,31 @@ struct DownloadManager : Component
                 }
 
                 StringArray changesList{chVec.data(), (int)chVec.size()};
-                changes = changesList.joinIntoString(", ");
+                result.changes = changesList.joinIntoString(", ");
             }
             else
             {
-                changes = changesObj;
+                result.changes = changesObj;
             }
 
             auto latestVersion = data.getProperty("version", var());
 
-            DBG("Current: " << String(currentVersion));
+            DBG("Current: " << currentVersion);
             DBG("Latest: " << latestVersion.toString());
 
 #if PRODUCTION_BUILD
-            updateAvailable = String(currentVersion).removeCharacters(".") < latestVersion.toString().removeCharacters(".");
+            result.updateAvailable = currentVersion.removeCharacters(".") < latestVersion.toString().removeCharacters(".");
 #else
-            DBG("Update result: " << int(String(currentVersion).removeCharacters(".") < latestVersion.toString().removeCharacters(".")));
-            updateAvailable = true;
+            DBG("Update result: " << int(currentVersion.removeCharacters(".") < latestVersion.toString().removeCharacters(".")));
+            result.updateAvailable = true;
 #endif
         }
         else
-            updateAvailable = false;
+            result.updateAvailable = false;
 
-        MessageManager::callAsync([&]
-                                  { onUpdateCheck(updateAvailable); });
+        // MessageManager::callAsync([&]
+        //                           { onUpdateCheck(result.updateAvailable); });
+        return result;
     }
 
     void downloadUpdate()
@@ -178,9 +191,9 @@ struct DownloadManager : Component
         no.setBounds(noBounds);
     }
 
-    bool updateAvailable = false;
+    const String downloadURL, downloadPath;
 
-    const String currentVersion, versionURL, downloadURL, downloadPath;
+    String changes;
 
 private:
 
@@ -198,8 +211,6 @@ private:
     std::atomic<bool> isDownloading = false;
     std::atomic<int> downloadProgress = 0;
     std::atomic<bool> downloadFinished = false;
-
-    String changes;
 
     std::function<void(gin::DownloadManager::DownloadResult)> result =
         [&](gin::DownloadManager::DownloadResult downloadResult)
