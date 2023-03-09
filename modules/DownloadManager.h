@@ -1,7 +1,8 @@
 
 #pragma once
+#include <JuceHeader.h>
 
-/** @brief struct to hold data about an update check */
+/** struct to hold data about an update check */
 struct UpdateResult
 {
     bool updateAvailable; // is an update avaiable?
