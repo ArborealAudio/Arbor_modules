@@ -8,18 +8,21 @@ struct VolumeMeterSource : Timer
         startTimerHz(60);
     }
 
-    ~VolumeMeterSource() { stopTimer(); }
+    ~VolumeMeterSource() override { stopTimer(); }
 
-    void prepare(const dsp::ProcessSpec &spec)
+    /**
+     * @param rmsWindow window in ms to measure RMS
+     */
+    void prepare(const dsp::ProcessSpec &spec, const float rmsWindow)
     {
         numSamplesToRead = spec.maximumBlockSize;
-        mainBuf.setSize(spec.numChannels, 44100, false, true, false);
+        mainBuf.setSize(spec.numChannels, jmax(44100, (int)spec.maximumBlockSize), false, true, false);
         rmsBuf.setSize(spec.numChannels, numSamplesToRead, false, true, false);
         fifo.setTotalSize(numSamplesToRead);
 
-        rmsSize = (0.1f * spec.sampleRate) / (float)spec.maximumBlockSize;
-        rmsvec[0].assign(rmsSize, 0.f);
-        rmsvec[1].assign(rmsSize, 0.f);
+        rmsSize = (rmsWindow * spec.sampleRate) / (float)spec.maximumBlockSize;
+        rmsvec[0].assign((size_t)rmsSize, 0.f);
+        rmsvec[1].assign((size_t)rmsSize, 0.f);
 
         sum[0] = sum[1] = 0.f;
 
@@ -35,10 +38,39 @@ struct VolumeMeterSource : Timer
         }
     }
 
+    void reset()
+    {
+        mainBuf.clear();
+        rmsBuf.clear();
+        fifo.reset();
+        sum[0] = sum[1] = 0.f;
+        rmsvec[0].assign(rmsSize, 0.f);
+        rmsvec[1].assign(rmsSize, 0.f);
+    }
+
+    template <typename T>
+    void copyBuffer(const T *const *buffer, size_t numChannels, size_t numSamples)
+    {
+        const auto scope = fifo.write(jmin((int)numSamples, fifo.getFreeSpace()));
+        if (scope.blockSize1 > 0)
+        {
+            mainBuf.copyFrom(0, scope.startIndex1, buffer[0], scope.blockSize1);
+            if (numChannels > 1)
+                mainBuf.copyFrom(1, scope.startIndex1, buffer[1], scope.blockSize1);
+        }
+        if (scope.blockSize2 > 0)
+        {
+            mainBuf.copyFrom(0, scope.startIndex2, buffer[0], scope.blockSize2);
+            if (numChannels > 1)
+                mainBuf.copyFrom(1, scope.startIndex2, buffer[1], scope.blockSize2);
+        }
+        bufCopied = true;
+    }
+
     void copyBuffer(const AudioBuffer<float> &_buffer)
     {
         const auto numSamples = _buffer.getNumSamples();
-        const auto scope = fifo.write(numSamples);
+        const auto scope = fifo.write(jmin((int)numSamples, fifo.getFreeSpace()));
         if (scope.blockSize1 > 0)
         {
             mainBuf.copyFrom(0, scope.startIndex1, _buffer, 0, 0, scope.blockSize1);
@@ -56,7 +88,8 @@ struct VolumeMeterSource : Timer
 
     void measureBlock()
     {
-        const auto scope = fifo.read(numSamplesToRead);
+        const auto numRead = jmin(numSamplesToRead, fifo.getNumReady());
+        const auto scope = fifo.read(numRead);
         if (scope.blockSize1 > 0)
         {
             rmsBuf.copyFrom(0, 0, mainBuf, 0, scope.startIndex1, scope.blockSize1);
@@ -70,12 +103,12 @@ struct VolumeMeterSource : Timer
                 rmsBuf.copyFrom(1, scope.blockSize1, mainBuf, 1, scope.startIndex2, scope.blockSize2);
         }
 
-        peak = rmsBuf.getMagnitude(0, rmsBuf.getNumSamples());
+        peak = rmsBuf.getMagnitude(0, numRead);
 
-        rmsL = rmsBuf.getRMSLevel(0, 0, rmsBuf.getNumSamples());
+        rmsL = rmsBuf.getRMSLevel(0, 0, numRead);
         rmsR = rmsL;
         if (rmsBuf.getNumChannels() > 1)
-            rmsR = rmsBuf.getRMSLevel(1, 0, rmsBuf.getNumSamples());
+            rmsR = rmsBuf.getRMSLevel(1, 0, numRead);
 
         if (rmsvec[0].size() > 0)
         {
@@ -117,6 +150,19 @@ struct VolumeMeterSource : Timer
         newBuf = true;
     }
 
+    inline float getAvgRMS() const
+    {
+        if (rmsvec[0].size() > 0 && rmsvec[1].size() > 0)
+        {
+            float rmsL, rmsR;
+            rmsL = std::sqrt(std::accumulate(rmsvec[0].begin(), rmsvec[0].end(), 0.f) / (float)rmsvec[0].size());
+            rmsR = std::sqrt(std::accumulate(rmsvec[1].begin(), rmsvec[1].end(), 0.f) / (float)rmsvec[1].size());
+            return (rmsL + rmsR) / 2.f;
+        }
+
+        return (std::sqrt(sum[0]) + std::sqrt(sum[1])) / 2.f;
+    }
+
     inline float getAvgRMS(int ch) const
     {
         if (rmsvec[ch].size() > 0)
@@ -127,6 +173,7 @@ struct VolumeMeterSource : Timer
 
     float peak = 0.f;
     std::atomic<bool> newBuf = false, bufCopied = false;
+
 private:
     AbstractFifo fifo{1024};
     AudioBuffer<float> mainBuf, rmsBuf;
@@ -143,11 +190,11 @@ struct VolumeMeterComponent : Component, Timer
 {
     enum
     {
-        Reduction = 1, // 0 - Volume | 1 - Reduction
+        Reduction = 1,       // 0 - Volume | 1 - Reduction
         Horizontal = 1 << 1, // 0 - Vertical | 1 - Horizontal
         ClipIndicator = 1 << 2
     };
-    typedef uint8_t flags_t;
+    typedef uint8_t Flags;
 
     Colour meterColor;
 
@@ -155,15 +202,13 @@ struct VolumeMeterComponent : Component, Timer
      * @param v audio source for the meter
      * @param s parameter the meter may be attached to (like a compression param, for instance). Used for turning the display on/off
      */
-    VolumeMeterComponent(VolumeMeterSource &v, flags_t f, std::atomic<float> *s = nullptr) : source(v), state(s), flags(f)
+    VolumeMeterComponent(VolumeMeterSource &v, Flags f, std::atomic<float> *s = nullptr) : source(v), state(s), flags(f)
     {
-        // setLookAndFeel(&lnf);
         startTimerHz(45);
     }
 
     ~VolumeMeterComponent() override
     {
-        // setLookAndFeel(nullptr);
         stopTimer();
     }
 
@@ -190,8 +235,8 @@ struct VolumeMeterComponent : Component, Timer
             g.fillRoundedRectangle((float)(ob.getCentreX() - 1), (float)ob.getY(), 2.f, (float)ob.getHeight(), 2.5f);
 
             auto bounds = Rectangle<float>{(float)ob.getX(), (float)ob.getY() + 4.f,
-                                            (float)ob.getRight() - ob.getX(),
-                                            (float)ob.getBottom() - ob.getY() - 2.f};
+                                           (float)ob.getRight() - ob.getX(),
+                                           (float)ob.getBottom() - ob.getY() - 2.f};
 
             bounds.reduce(4.f, 4.f);
 
@@ -235,9 +280,9 @@ struct VolumeMeterComponent : Component, Timer
         }
         case 1: // Reduction
         {
-            float maxDb = 24.f; // max dB the meter can display
+            float maxDb = 24.f;  // max dB the meter can display
             float padding = 0.f; // padding for the "GR" label
-            if (isMouseButtonDown() || numTicks >= 150)
+            if (isMouseButtonDown() || numTicks >= 225)
             {
                 numTicks = 0;
                 lastPeak = 0.f;
@@ -245,12 +290,12 @@ struct VolumeMeterComponent : Component, Timer
 
             g.setColour(meterColor);
 
-            auto db = Decibels::gainToDecibels(source.getAvgRMS(0), -60.f);
+            auto db = Decibels::gainToDecibels(source.getAvgRMS(), -60.f);
             auto peak = Decibels::gainToDecibels(source.peak, -60.f);
 
             auto ob = getLocalBounds();
             auto bounds = Rectangle<float>{ceilf(ob.getX()), ceilf(ob.getY()) + 1.f,
-                                            floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
+                                           floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
 
             if (!(flags & Horizontal)) // Vertical
             {
@@ -284,29 +329,30 @@ struct VolumeMeterComponent : Component, Timer
             else // Horizontal
             {
                 maxDb = 24.f;
-                padding = 20.f; // space for GR label
+                padding = 30.f; // space for meter values (if printing them. Must uncomment uses below!)
                 float topTrim = 10.f;
                 db = jmax(db, -maxDb + 3.f);
                 Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / maxDb).withTrimmedTop(topTrim);
 
                 g.fillRect(rect);
 
-                // g.setColour(Colours::red);
-                // g.drawFittedText(String((int)std::abs(lastPeak)), Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
-                // g.setColour(Colours::antiquewhite);
-                // g.drawFittedText("GR", Rectangle<int>(0, 0, padding * 0.75f, ob.getHeight()), Justification::centred, 1);
+#ifdef TEST_METER_VALUES
+                g.setColour(Colours::red);
+                g.drawFittedText(String(String((int)std::abs(lastPeak)) + "/" + String((int)std::abs(db))), Rectangle<int>(0, 0, padding, ob.getHeight()), Justification::centred, 1);
+                g.setColour(meterColor);
+#endif
 
                 if (peak < lastPeak)
                 {
                     peak = jmax(peak, -maxDb + 3.f);
-                    g.fillRect((bounds.getX() - peak * bounds.getWidth() / maxDb)/*  + padding */, topTrim, 2.f, (float)ob.getHeight() - topTrim);
+                    g.fillRect((bounds.getX() - peak * bounds.getWidth() / maxDb) /*  + padding */, topTrim, 2.f, (float)ob.getHeight() - topTrim);
                     lastPeak = peak;
                 }
                 else
-                    g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb)/*  + padding */, topTrim, 2.f, (float)ob.getHeight() - topTrim);
+                    g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb) /*  + padding */, topTrim, 2.f, (float)ob.getHeight() - topTrim);
 
                 /* ticks & numbers */
-                const float nWidth = bounds.getWidth()/*  - padding */;
+                const float nWidth = bounds.getWidth() /*  - padding */;
                 for (float i = 0; i <= bounds.getRight(); i += nWidth / 6.f)
                 {
                     g.setFont(topTrim);
@@ -352,13 +398,10 @@ struct VolumeMeterComponent : Component, Timer
     std::atomic<float> *getState() { return state; }
     void setState(std::atomic<float> *newState) { state = newState; }
 
-protected:
+private:
     VolumeMeterSource &source;
     int numTicks = 0;
-
-private:
-    // VolumeMeterLookAndFeel lnf;
-    flags_t flags;
+    Flags flags;
     std::atomic<float> *state;
     bool lastState = false;
     float lastPeak = 0.f;
