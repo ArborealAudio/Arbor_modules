@@ -13,16 +13,20 @@ enum class FilterType
     allpass
 };
 
-template <typename T>
+/// @brief Custom SVT Filter with xsimd compatibility
+/// @tparam T sample data type (float/double/xsimd register)
+/// @tparam useSmoother whether to use a built-in smoother for parameter changes
+template <typename T, bool useSmoother = false>
 class SVTFilter
 {
     double sampleRate = 44100.0;
     T g, h, R2;
-    std::vector<T> s1{ 2 }, s2{ 2 };
+    std::vector<T> s1{2}, s2{2};
 
-    T cutoffFrequency = (T)1000.0,
-      resonance = (T)1.0 / std::sqrt(2.0),
+    T cutoffFrequency = (T)1000.0, resonance = (T)1.0 / std::sqrt(2.0),
       gain = (T)1.0;
+
+    SmoothedValue<float> sm_freq, sm_reso;
 
     void update()
     {
@@ -47,13 +51,27 @@ public:
 
     void setCutoffFreq(T newFreq)
     {
-        cutoffFrequency = newFreq;
+        if constexpr (useSmoother)
+        {
+            sm_freq.setTargetValue(newFreq);
+            if (!sm_freq.isSmoothing())
+                cutoffFrequency = newFreq;
+        }
+        else
+            cutoffFrequency = newFreq;
         update();
     }
 
     void setResonance(T newRes)
     {
-        resonance = newRes;
+        if constexpr (useSmoother)
+        {
+            sm_reso.setTargetValue(newRes);
+            if (!sm_reso.isSmoothing())
+                resonance = newRes;
+        }
+        else
+            resonance = newRes;
         update();
     }
 
@@ -83,6 +101,9 @@ public:
         s1.resize(spec.numChannels);
         s2.resize(spec.numChannels);
 
+        sm_freq.reset(spec.sampleRate, 0.01f);
+        sm_reso.reset(spec.sampleRate, 0.01f);
+
         reset();
         update();
     }
@@ -90,13 +111,46 @@ public:
     template <class Block>
     void processBlock(Block &block)
     {
-        for (auto ch = 0; ch < block.getNumChannels(); ++ch)
+        if constexpr (useSmoother)
         {
-            auto in = block.getChannelPointer(ch);
-
-            for (auto i = 0; i < block.getNumSamples(); ++i)
+            if (sm_freq.isSmoothing() || sm_reso.isSmoothing())
             {
-                in[i] = processSample(ch, in[i]);
+                for (auto i = 0; i < block.getNumSamples(); ++i)
+                {
+                    cutoffFrequency = sm_freq.getNextValue();
+                    resonance = sm_reso.getNextValue();
+                    update();
+                    for (auto ch = 0; ch < block.getNumChannels(); ++ch)
+                    {
+                        auto in = block.getChannelPointer(ch);
+                        in[i] = processSample(ch, in[i]);
+                    }
+                }
+                return;
+            }
+            else
+            {
+                for (auto ch = 0; ch < block.getNumChannels(); ++ch)
+                {
+                    auto in = block.getChannelPointer(ch);
+
+                    for (auto i = 0; i < block.getNumSamples(); ++i)
+                    {
+                        in[i] = processSample(ch, in[i]);
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (auto ch = 0; ch < block.getNumChannels(); ++ch)
+            {
+                auto in = block.getChannelPointer(ch);
+
+                for (auto i = 0; i < block.getNumSamples(); ++i)
+                {
+                    in[i] = processSample(ch, in[i]);
+                }
             }
         }
     }
