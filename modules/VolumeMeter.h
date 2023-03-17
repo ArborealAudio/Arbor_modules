@@ -1,5 +1,6 @@
 // VolumeMeter.h
 #pragma once
+#include <JuceHeader.h>
 
 struct VolumeMeterSource : Timer
 {
@@ -192,11 +193,12 @@ struct VolumeMeterComponent : Component, Timer
     {
         Reduction = 1,       // 0 - Volume | 1 - Reduction
         Horizontal = 1 << 1, // 0 - Vertical | 1 - Horizontal
-        ClipIndicator = 1 << 2
+        ClipIndicator = 1 << 2,
+        Background = 1 << 3 // 0 - No background | 1 - draw a background
     };
     typedef uint8_t Flags;
 
-    Colour meterColor;
+    Colour meterColor, backgroundColor;
 
     /**
      * @param v audio source for the meter
@@ -288,8 +290,6 @@ struct VolumeMeterComponent : Component, Timer
                 lastPeak = 0.f;
             }
 
-            g.setColour(meterColor);
-
             auto db = Decibels::gainToDecibels(source.getAvgRMS(), -60.f);
             auto peak = Decibels::gainToDecibels(source.peak, -60.f);
 
@@ -297,7 +297,16 @@ struct VolumeMeterComponent : Component, Timer
             auto bounds = Rectangle<float>{ceilf(ob.getX()), ceilf(ob.getY()) + 1.f,
                                            floorf(ob.getRight()) - ceilf(ob.getX()) + 2.f, floorf(ob.getBottom()) - ceilf(ob.getY()) + 2.f};
 
-            if (!(flags & Horizontal)) // Vertical
+            if (flags & Background)
+            {
+                g.setColour(backgroundColor);
+                g.fillRoundedRectangle(bounds.reduced(2.f), 5.f);
+            }
+
+            bounds.reduce(4.f, 4.f);
+
+            g.setColour(meterColor);
+            if (!(flags & Horizontal)) // INCOMPLETE: Vertical
             {
                 maxDb = 36.f;
                 padding = 15.f;
@@ -332,7 +341,7 @@ struct VolumeMeterComponent : Component, Timer
                 padding = 30.f; // space for meter values (if printing them. Must uncomment uses below!)
                 float topTrim = 10.f;
                 db = jmax(db, -maxDb + 3.f);
-                Rectangle<float> rect = bounds.withWidth(bounds.getX() - db * bounds.getWidth() / maxDb).withTrimmedTop(topTrim);
+                Rectangle<float> rect = bounds.withRight(bounds.getX() - db * bounds.getWidth() / maxDb).withTrimmedTop(topTrim);
 
                 g.fillRect(rect);
 
@@ -342,23 +351,23 @@ struct VolumeMeterComponent : Component, Timer
                 g.setColour(meterColor);
 #endif
 
-                if (peak < lastPeak)
+                if (peak < lastPeak && peak != 0.f)
                 {
                     peak = jmax(peak, -maxDb + 3.f);
-                    g.fillRect((bounds.getX() - peak * bounds.getWidth() / maxDb) /*  + padding */, topTrim, 2.f, (float)ob.getHeight() - topTrim);
+                    g.fillRect((bounds.getX() - peak * bounds.getWidth() / maxDb) /*  + padding */, rect.getY(), 2.f, rect.getHeight());
                     lastPeak = peak;
                 }
-                else
-                    g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb) /*  + padding */, topTrim, 2.f, (float)ob.getHeight() - topTrim);
+                else if (lastPeak != 0.f)
+                    g.fillRect((bounds.getX() - lastPeak * bounds.getWidth() / maxDb) /*  + padding */, rect.getY(), 2.f, rect.getHeight());
 
                 /* ticks & numbers */
                 const float nWidth = bounds.getWidth() /*  - padding */;
-                for (float i = 0; i <= bounds.getRight(); i += nWidth / 6.f)
+                for (float i = 0; i + topTrim + 5 <= bounds.getRight(); i += nWidth / 6.f)
                 {
                     g.setFont(topTrim);
                     String str = "| ";
                     str.append(String(static_cast<int>((i / nWidth) * maxDb)), 2);
-                    g.drawText(str, Rectangle<int>(i - 1, 0, (int)topTrim + 5, (int)topTrim), Justification::centred);
+                    g.drawText(str, Rectangle<int>(bounds.getX() + i - 1, bounds.getY(), (int)topTrim + 5, (int)topTrim), Justification::centred);
                 }
             }
             if (getState() && !*getState()) /*reset peak if comp is turned off*/
