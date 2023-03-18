@@ -49,7 +49,8 @@ public:
 
     void setType(FilterType newType) { type = newType; }
 
-    void setCutoffFreq(T newFreq)
+    template <typename FloatType>
+    void setCutoffFreq(FloatType newFreq)
     {
         if constexpr (useSmoother)
         {
@@ -62,7 +63,8 @@ public:
         update();
     }
 
-    void setResonance(T newRes)
+    template <typename FloatType>
+    void setResonance(FloatType newRes)
     {
         if constexpr (useSmoother)
         {
