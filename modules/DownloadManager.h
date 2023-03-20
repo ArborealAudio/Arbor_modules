@@ -2,11 +2,20 @@
 #pragma once
 #include <JuceHeader.h>
 
+#if JUCE_WINDOWS
+static const char *os = "windows";
+#elif JUCE_MAC
+static const char *os = "macos";
+#elif JUCE_LINUX
+static const char *os = "linux";
+#endif
+
+static String downloadURL = "";
+
 /** struct to hold data about an update check */
 struct UpdateResult
 {
     bool updateAvailable; // is an update avaiable?
-    // const char *updateURL; // url to retrieve the update at
     String changes = ""; // comma-separated list of changes
 };
 
@@ -20,9 +29,10 @@ struct UpdateResult
 */
 struct DownloadManager : Component
 {
-    DownloadManager(const char *_downloadURL,
-                    const char *_downloadPath) : downloadURL(_downloadURL),
-                                                 downloadPath(_downloadPath)
+    /**
+    * @param _downloadPath location & filename to download to
+    */
+    DownloadManager(const char *_downloadPath) : downloadPath(_downloadPath)
     {
         addAndMakeVisible(yes);
         addAndMakeVisible(no);
@@ -55,7 +65,7 @@ struct DownloadManager : Component
     }
 
     /** @param force whether to force the check even if checked < 24hrs ago */
-    static UpdateResult checkForUpdate(const String &currentVersion, const String &versionURL, bool force = false, int64 lastCheck = 0)
+    static UpdateResult checkForUpdate(const String pluginName, const String &currentVersion, const String &versionURL, bool force = false, int64 lastCheck = 0)
     {
         UpdateResult result;
         if (!force)
@@ -77,7 +87,8 @@ struct DownloadManager : Component
             stream.read(buf, (int)size);
             auto data = JSON::parse(String(CharPointer_UTF8(buf)));
             free(buf);
-            auto changesObj = data.getProperty("changes", var());
+            auto pluginInfo = data.getProperty("plugins", var()).getProperty(pluginName, var());
+            auto changesObj = pluginInfo.getProperty("changes", var());
             if (changesObj.isArray())
             {
                 std::vector<String> chVec;
@@ -94,7 +105,8 @@ struct DownloadManager : Component
                 result.changes = changesObj;
             }
 
-            auto latestVersion = data.getProperty("version", var());
+            auto latestVersion = pluginInfo.getProperty("version", var());
+            downloadURL = pluginInfo.getProperty("bin", var()).getProperty(os, var()).toString();
 
             DBG("Current: " << currentVersion);
             DBG("Latest: " << latestVersion.toString());
@@ -187,7 +199,7 @@ struct DownloadManager : Component
         no.setBounds(noBounds);
     }
 
-    const String downloadURL, downloadPath;
+    const String url, downloadPath;
 
     String changes;
 
