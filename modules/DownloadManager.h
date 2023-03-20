@@ -7,7 +7,7 @@ struct UpdateResult
 {
     bool updateAvailable; // is an update avaiable?
     // const char *updateURL; // url to retrieve the update at
-    String changes; // comma-separated list of changes
+    String changes = ""; // comma-separated list of changes
 };
 
 /**
@@ -63,8 +63,6 @@ struct DownloadManager : Component
             auto dayAgo = Time::getCurrentTime() - RelativeTime::hours(24);
             if (lastCheck > dayAgo.toMilliseconds())
             {
-                // MessageManager::callAsync([&]
-                //                           { onUpdateCheck(false); });
                 result.updateAvailable = false;
                 return result;
             }
@@ -75,16 +73,15 @@ struct DownloadManager : Component
         auto size = stream.getTotalLength();
         if (connected && !stream.isError() && size > 0)
         {
-            char *buf = (char*)malloc(sizeof(char) * size);
-            auto bytesRead = stream.read(buf, size);
-            /** @PROBLEM: This apparently often throws exceptions */
+            char *buf = (char*)malloc(sizeof(char) * (size_t)size);
+            stream.read(buf, (int)size);
             auto data = JSON::parse(String(CharPointer_UTF8(buf)));
             free(buf);
             auto changesObj = data.getProperty("changes", var());
             if (changesObj.isArray())
             {
                 std::vector<String> chVec;
-                for (size_t i = 0; i < changesObj.size(); ++i)
+                for (auto i = 0; i < changesObj.size(); ++i)
                 {
                     chVec.emplace_back(changesObj[i].toString());
                 }
@@ -112,8 +109,6 @@ struct DownloadManager : Component
         else
             result.updateAvailable = false;
 
-        // MessageManager::callAsync([&]
-        //                           { onUpdateCheck(result.updateAvailable); });
         return result;
     }
 

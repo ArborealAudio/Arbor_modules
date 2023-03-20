@@ -7,6 +7,7 @@
 */
 
 #pragma once
+#include <JuceHeader.h>
 
 struct LiteThread : Thread
 {
