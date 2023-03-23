@@ -26,7 +26,8 @@ class SVTFilter
     T cutoffFrequency = (T)1000.0, resonance = (T)1.0 / std::sqrt(2.0),
       gain = (T)1.0;
 
-    SmoothedValue<float> sm_freq, sm_reso;
+    SmoothedValue<float> sm_reso;
+    SmoothedValue<float, ValueSmoothingTypes::Multiplicative> sm_freq;
 
     void update()
     {
@@ -84,9 +85,9 @@ public:
 
     FilterType getType() { return type; }
 
-    T getCutoffFreq() { return cutoffFrequency; }
+    T getCutoffFreq() { return sm_freq.getTargetValue(); }
 
-    T getResonance() { return resonance; }
+    T getResonance() { return sm_reso.getTargetValue(); }
 
     T getGain() { return gain; }
 
@@ -128,7 +129,6 @@ public:
                         in[i] = processSample(ch, in[i]);
                     }
                 }
-                return;
             }
             else
             {
@@ -165,7 +165,7 @@ public:
         }
     }
 
-    T processSample(size_t channel, T in)
+    inline T processSample(size_t channel, T in)
     {
         assert(s1.size() > channel && s1.size() > 0);
         assert(s2.size() > channel && s2.size() > 0);
