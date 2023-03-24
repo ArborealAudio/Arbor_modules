@@ -23,8 +23,8 @@ class SVTFilter
     T g, h, R2;
     std::vector<T> s1{2}, s2{2};
 
-    T cutoffFrequency = (T)1000.0, resonance = (T)1.0 / std::sqrt(2.0),
-      gain = (T)1.0;
+    float cutoffFrequency = 1000.0, resonance = 1.0 / std::sqrt(2.0),
+      gain = 1.0;
 
     SmoothedValue<float> sm_reso;
     SmoothedValue<float, ValueSmoothingTypes::Multiplicative> sm_freq;
@@ -85,9 +85,9 @@ public:
 
     FilterType getType() { return type; }
 
-    T getCutoffFreq() { return sm_freq.getTargetValue(); }
+    T getCutoffFreq() { if constexpr (useSmoother) return sm_freq.getTargetValue(); else return cutoffFrequency; }
 
-    T getResonance() { return sm_reso.getTargetValue(); }
+    T getResonance() { if constexpr (useSmoother) return sm_reso.getTargetValue(); else return resonance; }
 
     T getGain() { return gain; }
 
@@ -106,6 +106,9 @@ public:
 
         sm_freq.reset(spec.sampleRate, 0.01f);
         sm_reso.reset(spec.sampleRate, 0.01f);
+
+        sm_freq.setCurrentAndTargetValue(cutoffFrequency);
+        sm_reso.setCurrentAndTargetValue(resonance);
 
         reset();
         update();
