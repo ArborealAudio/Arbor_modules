@@ -18,9 +18,6 @@ static void writeConfigFile(const String configPath, const String &property, int
         xml.reset(new XmlElement("Config"));
     }
 
-    if (property == "size" && value > 1600)
-        value = 1600;
-
     xml->setAttribute(property, value);
     xml->writeTo(config);
 }
