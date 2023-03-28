@@ -1,5 +1,6 @@
 
 #pragma once
+#include "Arbor_modules/modules/Config.h"
 #include <JuceHeader.h>
 
 #if JUCE_WINDOWS
@@ -88,6 +89,8 @@ struct DownloadManager : Component
             auto data = JSON::parse(String(CharPointer_UTF8(buf)));
             free(buf);
             auto pluginInfo = data.getProperty("plugins", var()).getProperty(pluginName, var());
+            if (strix::readConfigFile(CONFIG_PATH, "beta_updates"))
+                pluginInfo = pluginInfo.getProperty("beta", var());
             auto changesObj = pluginInfo.getProperty("changes", var());
             if (changesObj.isArray())
             {
