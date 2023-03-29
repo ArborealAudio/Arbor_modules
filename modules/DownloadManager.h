@@ -66,7 +66,7 @@ struct DownloadManager : Component
     }
 
     /** @param force whether to force the check even if checked < 24hrs ago */
-    static UpdateResult checkForUpdate(const String pluginName, const String &currentVersion, const String &versionURL, bool force = false, int64 lastCheck = 0)
+    static UpdateResult checkForUpdate(const String pluginName, const String &currentVersion, const String &versionURL, bool force = false, bool beta = false, int64 lastCheck = 0)
     {
         UpdateResult result;
         if (!force)
@@ -89,7 +89,7 @@ struct DownloadManager : Component
             auto data = JSON::parse(String(CharPointer_UTF8(buf)));
             free(buf);
             auto pluginInfo = data.getProperty("plugins", var()).getProperty(pluginName, var());
-            if (strix::readConfigFile(CONFIG_PATH, "beta_updates"))
+            if (beta)
                 pluginInfo = pluginInfo.getProperty("beta", var());
             auto changesObj = pluginInfo.getProperty("changes", var());
             if (changesObj.isArray())
