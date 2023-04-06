@@ -112,6 +112,13 @@ struct Crossfade
         complete = false;
     }
 
+    // reset internal state to values set by `setFadeTime()`
+    void reset()
+    {
+        startGain = 0.f;
+        complete = false;
+    }
+
     template <typename T>
     inline void processWithState(const AudioBuffer<T> &dry, AudioBuffer<T> &wet, size_t numSamples)
     {
