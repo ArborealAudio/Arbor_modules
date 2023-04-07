@@ -100,13 +100,11 @@ struct Crossfade
     }
 
     bool complete = false;
-    float fadeTimeSec = 1.f;
     int fadeLengthSamples = 0;
     float startGain, endGain = 0.f;
 
     void setFadeTime(float sampleRate, float newFadeTimeSec)
     {
-        fadeTimeSec = newFadeTimeSec;
         fadeLengthSamples = sampleRate * newFadeTimeSec;
         startGain = 0.f;
         complete = false;
@@ -122,8 +120,7 @@ struct Crossfade
     template <typename T>
     inline void processWithState(const AudioBuffer<T> &dry, AudioBuffer<T> &wet, size_t numSamples)
     {
-        if (complete)
-            return;
+        assert(!complete);
         endGain = startGain + (1.f / (fadeLengthSamples / numSamples));
         process(dry, wet, numSamples, startGain, endGain);
         startGain = endGain;
@@ -134,8 +131,7 @@ struct Crossfade
     template <typename Block>
     inline void processWithState(const Block &dry, Block &wet, size_t numSamples)
     {
-        if (complete)
-            return;
+        assert(!complete);
         endGain = startGain + (1.f / (fadeLengthSamples / numSamples));
         process(dry, wet, numSamples, startGain, endGain);
         startGain = endGain;
