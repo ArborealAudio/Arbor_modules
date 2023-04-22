@@ -84,7 +84,8 @@ struct Crossfade
     template <typename T>
     inline static void process(const AudioBuffer<T> &dry, AudioBuffer<T> &wet, size_t numSamples, float startGain = 0.f, float endGain = 1.f)
     {
-        for (size_t ch = 0; ch < dry.getNumChannels(); ++ch)
+        auto numChannels = jmin(dry.getNumChannels(), wet.getNumChannels());
+        for (size_t ch = 0; ch < numChannels; ++ch)
         {
             process(dry.getReadPointer(ch), wet.getWritePointer(ch), numSamples, startGain, endGain);
         }
@@ -93,7 +94,8 @@ struct Crossfade
     template <typename Block>
     inline static void process(const Block &dryBlock, Block &outBlock, size_t numSamples, float startGain = 0.f, float endGain = 1.f)
     {
-        for (size_t ch = 0; ch < outBlock.getNumChannels(); ++ch)
+        auto numChannels = jmin(dryBlock.getNumChannels(), outBlock.getNumChannels());
+        for (size_t ch = 0; ch < numChannels; ++ch)
         {
             process(dryBlock.getChannelPointer(ch), outBlock.getChannelPointer(ch), numSamples, startGain, endGain);
         }
