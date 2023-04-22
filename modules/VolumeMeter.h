@@ -49,6 +49,7 @@ struct VolumeMeterSource : Timer
         rmsvec[1].assign(rmsSize, 0.f);
     }
 
+    // lock-free method for copying data to the meter's buffer
     template <typename T>
     void copyBuffer(const T *const *buffer, size_t numChannels, size_t numSamples)
     {
@@ -68,6 +69,7 @@ struct VolumeMeterSource : Timer
         bufCopied = true;
     }
 
+    // lock-free method for copying data to the meter's buffer
     void copyBuffer(const AudioBuffer<float> &_buffer)
     {
         const auto numSamples = _buffer.getNumSamples();
@@ -131,6 +133,7 @@ struct VolumeMeterSource : Timer
     {
         if (bufCopied)
         {
+            std::unique_lock<std::mutex> lock (mutex);
             measureBlock();
             bufCopied = false;
         }
@@ -179,6 +182,8 @@ private:
     AbstractFifo fifo{1024};
     AudioBuffer<float> mainBuf, rmsBuf;
     int numSamplesToRead = 0;
+
+    std::mutex mutex;
 
     float rmsSize = 0.f;
     float rmsL = 0.f, rmsR = 0.f;
