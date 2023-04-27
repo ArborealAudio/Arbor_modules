@@ -35,6 +35,7 @@ using namespace juce;
 #include "modules/LRFilter.h"
 #include "modules/ReleasePool.h"
 #include "modules/Delay.h"
+#include "modules/RingBuffer.h"
 #include "modules/Parameter.h"
 #include "modules/SmoothGain.h"
 #include "modules/StereoImaging.h"
