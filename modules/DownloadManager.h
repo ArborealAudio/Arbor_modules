@@ -43,6 +43,7 @@ struct DownloadManager : Component
             if (!isDownloading)
             {
                 setVisible(false);
+                shouldBeHidden = true;
             }
             else
             {
@@ -205,6 +206,8 @@ struct DownloadManager : Component
     const String url, downloadPath;
 
     String changes;
+
+    bool shouldBeHidden = false; // set to true when "No" is clicked
 
 private:
 
