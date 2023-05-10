@@ -73,7 +73,7 @@ struct VolumeMeterSource : Timer
     void copyBuffer(const AudioBuffer<float> &_buffer)
     {
         const auto numSamples = _buffer.getNumSamples();
-        const auto scope = fifo.write(jmin((int)numSamples, fifo.getFreeSpace()));
+        const auto scope = fifo.write(jmin(numSamples, fifo.getFreeSpace()));
         if (scope.blockSize1 > 0)
         {
             mainBuf.copyFrom(0, scope.startIndex1, _buffer, 0, 0, scope.blockSize1);
@@ -92,6 +92,8 @@ struct VolumeMeterSource : Timer
     void measureBlock()
     {
         const auto numRead = jmin(numSamplesToRead, fifo.getNumReady());
+        if (numRead <= 0)
+            return;
         const auto scope = fifo.read(numRead);
         if (scope.blockSize1 > 0)
         {
@@ -131,9 +133,10 @@ struct VolumeMeterSource : Timer
 
     void timerCallback() override
     {
-        if (bufCopied)
+        // std::unique_lock<std::mutex> lock (mutex);
+        juce::ScopedTryLock lock(mutex);
+        if (bufCopied && lock.isLocked())
         {
-            std::unique_lock<std::mutex> lock (mutex);
             measureBlock();
             bufCopied = false;
         }
@@ -183,7 +186,7 @@ private:
     AudioBuffer<float> mainBuf, rmsBuf;
     int numSamplesToRead = 0;
 
-    std::mutex mutex;
+    juce::CriticalSection mutex;
 
     float rmsSize = 0.f;
     float rmsL = 0.f, rmsR = 0.f;

@@ -11,7 +11,7 @@
 
 struct LiteThread : Thread
 {
-    /** @param maxNumJobs max number of jobs to be run. -1 means no limit */
+    /** @param maxNumJobs max number of jobs to be run. Thread will be destroyed once this limit is reached. -1 means no limit */
     LiteThread(int maxNumJobs) : Thread("LiteThread"), jobLimit(maxNumJobs)
     {
         DBG("Starting check thread...");
@@ -28,7 +28,7 @@ struct LiteThread : Thread
 
     void run() override
     {
-        bool working = true;
+        working = true;
         while (!threadShouldExit() && working)
         {
             if (!jobs.empty())
@@ -46,8 +46,6 @@ struct LiteThread : Thread
                 wait(100);
         }
         DBG("Check thread exited loop");
-        if (onLoopExit)
-            onLoopExit();
     }
 
     /* locking method for adding jobs to the thread */
@@ -58,7 +56,7 @@ struct LiteThread : Thread
         notify();
     }
 
-    std::function<void()> onLoopExit;
+    bool working = true;
 
 private:
     std::mutex mutex;
