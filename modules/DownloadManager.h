@@ -4,11 +4,11 @@
 #include <JuceHeader.h>
 
 #if JUCE_WINDOWS
-static const char *os = "windows";
+    #define OS "windows"
 #elif JUCE_MAC
-static const char *os = "macos";
+    #define OS "macos"
 #elif JUCE_LINUX
-static const char *os = "linux";
+    #define OS "linux"
 #endif
 
 static String downloadURL = "";
@@ -88,10 +88,9 @@ struct DownloadManager : Component
             char *buf = (char*)malloc(sizeof(char) * (size_t)size);
             stream.read(buf, (int)size);
             auto data = JSON::parse(String(CharPointer_UTF8(buf)));
-            free(buf);
             auto pluginInfo = data.getProperty("plugins", var()).getProperty(pluginName, var());
-            if (beta)
-                pluginInfo = pluginInfo.getProperty("beta", var());
+            // if (beta)
+                // pluginInfo = pluginInfo.getProperty("beta", var());
             auto changesObj = pluginInfo.getProperty("changes", var());
             if (changesObj.isArray())
             {
@@ -110,7 +109,7 @@ struct DownloadManager : Component
             }
 
             auto latestVersion = pluginInfo.getProperty("version", var());
-            downloadURL = pluginInfo.getProperty("bin", var()).getProperty(os, var()).toString();
+            downloadURL = pluginInfo.getProperty("bin", var()).getProperty(OS, var()).toString();
 
             DBG("Current: " << currentVersion);
             DBG("Latest: " << latestVersion.toString());
@@ -121,6 +120,7 @@ struct DownloadManager : Component
             DBG("Update result: " << int(currentVersion.removeCharacters(".") < latestVersion.toString().removeCharacters(".")));
             result.updateAvailable = true;
 #endif
+            free(buf);
         }
         else
             result.updateAvailable = false;
