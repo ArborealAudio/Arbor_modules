@@ -239,7 +239,7 @@ private:
             return;
         }
 
-        auto bin = File(downloadPath);
+        auto bin = File(File::getSpecialLocation(File::userHomeDirectory).getFullPathName() + "/Downloads/" + downloadPath);
         if (!downloadResult.saveToFile(bin))
             downloadStatus = false;
         else
