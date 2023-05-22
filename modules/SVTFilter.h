@@ -1,18 +1,6 @@
 // SVTFilter.h
 #pragma once
 
-enum class FilterType
-{
-    lowpass,
-    bandpass,
-    highpass,
-    notch,
-    peak,
-    firstOrderLowpass,
-    firstOrderHighpass,
-    allpass
-};
-
 /// @brief Custom SVT Filter with xsimd compatibility
 /// @tparam T sample data type (float/double/xsimd register)
 /// @tparam useSmoother whether to use a built-in smoother for parameter changes

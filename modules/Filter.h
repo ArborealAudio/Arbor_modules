@@ -3,20 +3,40 @@
 	(c) Arboreal Audio, LLC 2023
 */
 
+
+// THIS DOENS"T WORK RIGHT!!
+
 #include <cassert>
 #include <cmath>
 #include <vector>
 
+// moved this from SVTFilter.h
+// certain types will not be implemented yet
+enum FilterType
+{
+    lowpass,
+    bandpass,
+    highpass,
+    notch,
+    peak,
+    firstOrderLowpass,
+    firstOrderHighpass,
+    allpass
+};
+
 template <typename T>
 struct Filter
 {
-	Filter() {}
+	Filter(FilterType _type) : type(_type)
+	{}
 
 	void init(int numChannels, double sampleRate, double cutoff, double reso)
 	{
 		this->sampleRate = sampleRate;
 		this->cutoff = cutoff;
 		this->reso = reso;
+
+		setCoeffs();
 
 		xn[0].resize(numChannels);
 		xn[1].resize(numChannels);
@@ -32,28 +52,60 @@ struct Filter
 				ch = 0.0;
 	}
 	
-	// just a lowpass for now!
 	void setCoeffs()
 	{
 		const auto w0 = 2.0 * M_PI * (cutoff / sampleRate);
 		const auto q = 1.0 / (2.0 * reso);
-		const auto alpha = q * std::sin(w0);
-
-		a1 = -2.0 * std::cos(w0) / (1.0 + alpha);
-		a2 = (1.0 - alpha) / (1.0 + alpha);
+		const auto tmp = std::exp(-q * w0);
+		a1 = -2.0 * tmp;
+		if (q <= 1.0)
+			a1 *= std::cos(std::sqrt(1.0 - q * q) * w0);
+		else
+			a1 *= std::cosh(std::sqrt(q * q - 1.0) * w0);
+		a2 = tmp * tmp;
 
 		const auto f0 = cutoff / sampleRate;
 		const auto freq2 = f0 * f0;
-		const auto r0 = 1.0 + a1 + a2;
-		const auto r1_num = (1.0 - a1 + a2) * freq2;
-		const auto r1_f2 = (1.0 - freq2) * (1.0 - freq2);
-		const auto r1_denom = std::sqrt(r1_f2 + freq2 / (reso*reso));
+		const auto fac = (1.0 - freq2) * (1.0 - freq2);
 
-		const auto r1 = r1_num / r1_denom;
+		double r0, r1, r1_num, r1_denom;
+		if (type == lowpass)
+		{
+			r0 = 1.0 + a1 + a2;
+			r1_num = (1.0 - a1 + a2) * freq2;
+			r1_denom = std::sqrt(fac + freq2 / (reso*reso));
+			r1 = r1_num / r1_denom;
 
-		b0 = (r0 + r1) / 2.0;
-		b1 = r0 - b0;
-		b2 = 0.0;
+			b0 = (r0 + r1) / 2.0;
+			b1 = r0 - b0;
+			b2 = 0.0;
+		}
+		else if (type == highpass)
+		{
+			r1_num = 1.0 - a1 + a2;
+			r1_denom = std::sqrt(fac + freq2 / (reso*reso));
+			r1 = r1_num / r1_denom;
+
+			b0 = r1 / 4.0;
+			b1 = -2.0 * b0;
+			b2 = b0;
+		}
+	}
+
+	void setCutoff(double newCutoff)
+	{
+		cutoff = newCutoff;
+		setCoeffs();
+	}
+
+	void reset()
+	{
+		for (auto &x : xn)
+			for (auto &ch : x)
+				ch = 0.0;
+		for (auto &y : yn)
+			for (auto &ch : y)
+				ch = 0.0;
 	}
 
 	T processSample(int ch, T x)
@@ -78,9 +130,25 @@ struct Filter
 				processSample(ch, in[ch][i]);
 	}
 
+	void processBlock(juce::dsp::AudioBlock<T> block)
+	{
+		const auto numChannels = block.getNumChannels();
+		const auto numSamples = block.getNumSamples();
+		assert(numChannels <= xn[0].size());
+
+		for (size_t ch = 0; ch < numChannels; ++ch)
+		{
+			auto in = block.getChannelPointer(ch);
+			for (size_t i = 0; i < numSamples; ++i)
+				in[i] = processSample(ch, in[i]);
+		}
+	}
+
 	T cutoff, reso;
 
 private:
+
+	FilterType type;
 
 	double sampleRate = 44100.0;
 	

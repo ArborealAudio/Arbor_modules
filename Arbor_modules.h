@@ -30,6 +30,7 @@ using namespace juce;
 #include "modules/SIMD.h"
 #include "modules/FastMath.h"
 #include "modules/VolumeMeter.h"
+#include "modules/Filter.h"
 #include "modules/IIRFilter.h"
 #include "modules/SVTFilter.h"
 #include "modules/LRFilter.h"
