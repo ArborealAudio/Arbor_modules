@@ -90,6 +90,17 @@ struct Filter
 			b1 = -2.0 * b0;
 			b2 = b0;
 		}
+		else if (type == bandpass)
+		{
+			r0 = (1.0 + a1 + a2) / (M_PI * f0 * reso);
+			r1_num = (1.0 - a1 + a2) * (f0 / reso);
+			r1_denom = std::sqrt(fac + (freq2 / (reso*reso)));
+			r1 = r1_num / r1_denom;
+
+			b1 = -r1 / 2.0;
+			b0 = (r0 - b1) / 2.0;
+			b2 = -b0 - b1;
+		}
 	}
 
 	void setCutoff(double newCutoff)
@@ -144,7 +155,7 @@ struct Filter
 		}
 	}
 
-	T cutoff, reso;
+	double cutoff, reso;
 
 private:
 
@@ -155,5 +166,5 @@ private:
 	std::vector<T> xn [2];
 	std::vector<T> yn [2];
 
-	T a1, a2, b0, b1, b2;
+	double a1, a2, b0, b1, b2;
 };
