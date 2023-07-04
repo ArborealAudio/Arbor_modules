@@ -212,9 +212,9 @@ struct VolumeMeterComponent : Component, Timer
      * @param v audio source for the meter
      * @param s parameter the meter may be attached to (like a compression param, for instance). Used for turning the display on/off
      */
-    VolumeMeterComponent(VolumeMeterSource &v, Flags f, std::atomic<float> *s = nullptr) : source(v), state(s), flags(f)
+    VolumeMeterComponent(VolumeMeterSource &v, Flags f, int refreshRate, std::atomic<float> *s = nullptr) : source(v), state(s), flags(f)
     {
-        startTimerHz(30);
+        startTimerHz(refreshRate);
     }
 
     ~VolumeMeterComponent() override
