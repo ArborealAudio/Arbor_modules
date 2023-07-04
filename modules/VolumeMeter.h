@@ -12,7 +12,7 @@ struct VolumeMeterSource : Timer
     ~VolumeMeterSource() override { stopTimer(); }
 
     /**
-     * @param rmsWindow window in ms to measure RMS
+     * @param rmsWindow window in sec to measure RMS
      */
     void prepare(const dsp::ProcessSpec &spec, const float rmsWindow)
     {
