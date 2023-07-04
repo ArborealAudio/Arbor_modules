@@ -8,11 +8,15 @@ Everything can be accessed within the `strix` namespace, except the xsimd librar
 
 Includes:
  - xsimd-capable forks of some JUCE dsp classes
- - Fast Math (only has one function so far lol)
+ - Fast math, plus wrappers around std:: and xsimd:: math functions
  - CLAP-able parameters
  - SIMD helpers for creating interleaved SIMD audio blocks
  - Release Pool for threadsafe deletion of processors, based on [Timur Doumler's presentation](https://github.com/CppCon/CppCon2015/blob/master/Presentations/C++%20In%20the%20Audio%20Industry/C++%20In%20the%20Audio%20Industry%20-%20Timur%20Doumler%20-%20CppCon%202015.pdf)
  - Smooth Gain helpers
+ - A volume meter component not exactly fit for plug-and-play usage
+ - Small thread module for one-off jobs
+ - Helper functions for writing to a config file
+ - DownloadManager, for managing plugin update checking & retrieving
 
 ## License
 

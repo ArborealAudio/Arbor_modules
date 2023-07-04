@@ -136,6 +136,7 @@ public:
     {
         SR = spec.sampleRate;
         delay.prepare(spec);
+        sm.reset(spec.sampleRate, 0.01f);
     }
 
     void reset()
@@ -153,17 +154,17 @@ public:
     {
         assert(block.getNumChannels() > 1); /* we need 2 output channels */
 
-        T inc = 0.0;
-        if (lastMult != mult)
-            inc = (lastMult - mult) / (T)block.getNumSamples();
+        if (mult != sm.getCurrentValue())
+            sm.setTargetValue(mult);
 
         auto left = block.getChannelPointer(0);
         auto right = block.getChannelPointer(1);
 
         for (size_t i = 0; i < block.getNumSamples(); ++i)
         {
+            auto amt = sm.getNextValue();
             delay.pushSample(0, left[i]);
-            T d = lastMult * delay.popSample(0, -1.0);
+            T d = amt * delay.popSample(0, -1.0);
 
             auto mid = (left[i] + right[i]) * 0.5;
             auto side = (left[i] - right[i]) * 0.5;
@@ -171,18 +172,14 @@ public:
 
             left[i] = mid + side;
             right[i] = mid - side;
-
-            lastMult += inc;
         }
-
-        lastMult = mult;
     }
 
 private:
     strix::Delay<T> delay{4410};
     double SR = 44100.0;
 
-    T lastMult = 0.0;
+    juce::SmoothedValue<T> sm;
 };
 
 /**

@@ -1,28 +1,21 @@
 // SVTFilter.h
 #pragma once
 
-enum class FilterType
-{
-    lowpass,
-    bandpass,
-    highpass,
-    notch,
-    peak,
-    firstOrderLowpass,
-    firstOrderHighpass,
-    allpass
-};
-
-template <typename T>
+/// @brief Custom SVT Filter with xsimd compatibility
+/// @tparam T sample data type (float/double/xsimd register)
+/// @tparam useSmoother whether to use a built-in smoother for parameter changes
+template <typename T, bool useSmoother = false>
 class SVTFilter
 {
     double sampleRate = 44100.0;
     T g, h, R2;
-    std::vector<T> s1{ 2 }, s2{ 2 };
+    std::vector<T> s1{2}, s2{2};
 
-    T cutoffFrequency = (T)1000.0,
-      resonance = (T)1.0 / std::sqrt(2.0),
-      gain = (T)1.0;
+    float cutoffFrequency = 1000.0, resonance = 1.0 / std::sqrt(2.0),
+      gain = 1.0;
+
+    SmoothedValue<float> sm_reso;
+    SmoothedValue<float, ValueSmoothingTypes::Multiplicative> sm_freq;
 
     void update()
     {
@@ -45,15 +38,31 @@ public:
 
     void setType(FilterType newType) { type = newType; }
 
-    void setCutoffFreq(T newFreq)
+    template <typename FloatType>
+    void setCutoffFreq(FloatType newFreq)
     {
-        cutoffFrequency = newFreq;
+        if constexpr (useSmoother)
+        {
+            sm_freq.setTargetValue(newFreq);
+            if (!sm_freq.isSmoothing())
+                cutoffFrequency = newFreq;
+        }
+        else
+            cutoffFrequency = newFreq;
         update();
     }
 
-    void setResonance(T newRes)
+    template <typename FloatType>
+    void setResonance(FloatType newRes)
     {
-        resonance = newRes;
+        if constexpr (useSmoother)
+        {
+            sm_reso.setTargetValue(newRes);
+            if (!sm_reso.isSmoothing())
+                resonance = newRes;
+        }
+        else
+            resonance = newRes;
         update();
     }
 
@@ -64,9 +73,9 @@ public:
 
     FilterType getType() { return type; }
 
-    T getCutoffFreq() { return cutoffFrequency; }
+    T getCutoffFreq() { if constexpr (useSmoother) return sm_freq.getTargetValue(); else return cutoffFrequency; }
 
-    T getResonance() { return resonance; }
+    T getResonance() { if constexpr (useSmoother) return sm_reso.getTargetValue(); else return resonance; }
 
     T getGain() { return gain; }
 
@@ -83,6 +92,12 @@ public:
         s1.resize(spec.numChannels);
         s2.resize(spec.numChannels);
 
+        sm_freq.reset(spec.sampleRate, 0.01f);
+        sm_reso.reset(spec.sampleRate, 0.01f);
+
+        sm_freq.setCurrentAndTargetValue(cutoffFrequency);
+        sm_reso.setCurrentAndTargetValue(resonance);
+
         reset();
         update();
     }
@@ -90,18 +105,58 @@ public:
     template <class Block>
     void processBlock(Block &block)
     {
-        for (auto ch = 0; ch < block.getNumChannels(); ++ch)
+        if constexpr (useSmoother)
         {
-            auto in = block.getChannelPointer(ch);
-
-            for (auto i = 0; i < block.getNumSamples(); ++i)
+            if (sm_freq.isSmoothing() || sm_reso.isSmoothing())
             {
-                in[i] = processSample(ch, in[i]);
+                for (auto i = 0; i < block.getNumSamples(); ++i)
+                {
+                    cutoffFrequency = sm_freq.getNextValue();
+                    resonance = sm_reso.getNextValue();
+                    update();
+                    for (auto ch = 0; ch < block.getNumChannels(); ++ch)
+                    {
+                        auto in = block.getChannelPointer(ch);
+                        in[i] = processSample(ch, in[i]);
+                    }
+                }
+            }
+            else
+            {
+                for (auto ch = 0; ch < block.getNumChannels(); ++ch)
+                {
+                    auto in = block.getChannelPointer(ch);
+
+                    for (auto i = 0; i < block.getNumSamples(); ++i)
+                    {
+                        in[i] = processSample(ch, in[i]);
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (auto ch = 0; ch < block.getNumChannels(); ++ch)
+            {
+                auto in = block.getChannelPointer(ch);
+
+                for (auto i = 0; i < block.getNumSamples(); ++i)
+                {
+                    in[i] = processSample(ch, in[i]);
+                }
             }
         }
     }
 
-    T processSample(size_t channel, T in)
+    void processChannel(T *in, size_t ch, size_t numSamples)
+    {
+        for (size_t i = 0; i < numSamples; ++i)
+        {
+            in[i] = processSample(ch, in[i]);
+        }
+    }
+
+    inline T processSample(size_t channel, T in)
     {
         assert(s1.size() > channel && s1.size() > 0);
         assert(s2.size() > channel && s2.size() > 0);
