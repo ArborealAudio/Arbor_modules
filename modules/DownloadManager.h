@@ -2,6 +2,7 @@
 #pragma once
 #include "Arbor_modules/modules/Config.h"
 #include <JuceHeader.h>
+#include <corecrt_wstdio.h>
 
 #if JUCE_WINDOWS
     #define OS "windows"

@@ -214,7 +214,7 @@ struct VolumeMeterComponent : Component, Timer
      */
     VolumeMeterComponent(VolumeMeterSource &v, Flags f, std::atomic<float> *s = nullptr) : source(v), state(s), flags(f)
     {
-        startTimerHz(45);
+        startTimerHz(30);
     }
 
     ~VolumeMeterComponent() override
