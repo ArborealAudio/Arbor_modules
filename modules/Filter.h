@@ -4,8 +4,6 @@
 */
 
 
-// THIS DOENS"T WORK RIGHT!!
-
 #include <cassert>
 #include <cmath>
 #include <vector>
