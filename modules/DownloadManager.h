@@ -24,7 +24,7 @@ struct UpdateResult
  * DownloadManager.h
  * What it sounds like. Depends on gin's DownloadManager
  * 
- * Expects a macro PRODUCTION_BUILD to be true, or else
+ * Expects a macro ARBOR_DEBUG_DOWNLOADER to be true, or else
  * for debug purposes will always return that an update
  * is available
 */
@@ -114,7 +114,7 @@ struct DownloadManager : Component
             DBG("Current: " << currentVersion);
             DBG("Latest: " << latestVersion.toString());
 
-#if PRODUCTION_BUILD
+#if ARBOR_DEBUG_DOWNLOADER
             result.updateAvailable = currentVersion.removeCharacters(".") < latestVersion.toString().removeCharacters(".");
 #else
             DBG("Update result: " << int(currentVersion.removeCharacters(".") < latestVersion.toString().removeCharacters(".")));
