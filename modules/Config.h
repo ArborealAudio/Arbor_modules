@@ -4,6 +4,7 @@
 */
 
 #pragma once
+#include <JuceHeader.h>
 
 /** @param configPath path RELATIVE to user app data dir */
 static void writeConfigFile(const String configPath, const String &property, int value)
