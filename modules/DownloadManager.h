@@ -67,7 +67,11 @@ struct DownloadManager : Component
     }
 
     /** @param force whether to force the check even if checked < 24hrs ago */
-    static UpdateResult checkForUpdate(const String pluginName, const String &currentVersion, const String &versionURL, bool force = false, bool beta = false, int64 lastCheck = 0)
+    static UpdateResult checkForUpdate(const String pluginName,
+                                       const String &currentVersion,
+                                       const String &versionURL,
+                                       bool force = false, bool beta = false,
+                                       int64 lastCheck = 0)
     {
         UpdateResult result;
         if (!force)
@@ -88,9 +92,10 @@ struct DownloadManager : Component
             char *buf = (char*)malloc(sizeof(char) * (size_t)size);
             stream.read(buf, (int)size);
             auto data = JSON::parse(String(CharPointer_UTF8(buf)));
-            auto pluginInfo = data.getProperty("plugins", var()).getProperty(pluginName, var());
+            auto pluginInfo = data.getProperty("plugins", var())
+                                  .getProperty(pluginName, var());
             // if (beta)
-                // pluginInfo = pluginInfo.getProperty("beta", var());
+            // pluginInfo = pluginInfo.getProperty("beta", var());
             auto changesObj = pluginInfo.getProperty("changes", var());
             if (changesObj.isArray())
             {
@@ -109,15 +114,21 @@ struct DownloadManager : Component
             }
 
             auto latestVersion = pluginInfo.getProperty("version", var());
-            downloadURL = pluginInfo.getProperty("bin", var()).getProperty(OS, var()).toString();
+            downloadURL = pluginInfo.getProperty("bin", var())
+                              .getProperty(OS, var())
+                              .toString();
 
             DBG("Current: " << currentVersion);
             DBG("Latest: " << latestVersion.toString());
 
 #if ARBOR_DEBUG_DOWNLOADER
-            result.updateAvailable = currentVersion.removeCharacters(".") < latestVersion.toString().removeCharacters(".");
+            result.updateAvailable =
+                currentVersion.removeCharacters(".") <
+                latestVersion.toString().removeCharacters(".");
 #else
-            DBG("Update result: " << int(currentVersion.removeCharacters(".") < latestVersion.toString().removeCharacters(".")));
+            DBG("Update result: "
+                << int(currentVersion.removeCharacters(".") <
+                       latestVersion.toString().removeCharacters(".")));
             result.updateAvailable = true;
 #endif
             free(buf);
@@ -149,24 +160,30 @@ struct DownloadManager : Component
 
             g.setColour(Colours::white);
 
-            auto textbounds = Rectangle<int>{getLocalBounds().reduced(10).withTrimmedBottom(70)};
+            auto textbounds = Rectangle<int>{
+                getLocalBounds().reduced(10).withTrimmedBottom(70)};
 
             if (!downloadFinished.load())
             {
                 if (!isDownloading.load())
-                    g.drawFittedText("A new update is available! Would you like to download?\n\nChanges:\n" + changes, textbounds, Justification::centredTop, 10, 0.f);
+                    g.drawFittedText("A new update is available! Would you "
+                                     "like to download?\n\nChanges:\n" +
+                                         changes,
+                                     textbounds, Justification::centredTop, 10,
+                                     0.f);
                 else
-                    g.drawFittedText("Downloading... " + String(downloadProgress.load()) + "%",
-                                     textbounds, Justification::centred,
-                                     1, 1.f);
-            }
-            else
-            {
+                    g.drawFittedText("Downloading... " +
+                                         String(downloadProgress.load()) + "%",
+                                     textbounds, Justification::centred, 1,
+                                     1.f);
+            } else {
                 if (downloadStatus.load())
                 {
-                    g.drawFittedText("Download complete.\nThe installer is in your Downloads folder. You must close your DAW to run the installation.",
-                                     textbounds, Justification::centred,
-                                     7, 1.f);
+                    g.drawFittedText("Download complete.\nThe installer is in "
+                                     "your Downloads folder. You must close "
+                                     "your DAW to run the installation.",
+                                     textbounds, Justification::centred, 7,
+                                     1.f);
                     yes.setVisible(false);
                     no.setButtonText("Close");
                 }
@@ -196,8 +213,12 @@ struct DownloadManager : Component
         auto halfWidth = bounds.getWidth() / 2;
         auto halfHeight = bounds.getHeight() / 2;
 
-        Rectangle<int> yesBounds{bounds.withTrimmedTop(halfHeight).withTrimmedRight(halfWidth).reduced(20, 30)};
-        Rectangle<int> noBounds{bounds.withTrimmedTop(halfHeight).withTrimmedLeft(halfWidth).reduced(20, 30)};
+        Rectangle<int> yesBounds{bounds.withTrimmedTop(halfHeight)
+                                     .withTrimmedRight(halfWidth)
+                                     .reduced(20, 30)};
+        Rectangle<int> noBounds{bounds.withTrimmedTop(halfHeight)
+                                    .withTrimmedLeft(halfWidth)
+                                    .reduced(20, 30)};
 
         yes.setBounds(yesBounds);
         no.setBounds(noBounds);
@@ -239,7 +260,9 @@ private:
             return;
         }
 
-        auto bin = File(File::getSpecialLocation(File::userHomeDirectory).getFullPathName() + "/Downloads/" + downloadPath);
+        auto bin = File(File::getSpecialLocation(File::userHomeDirectory)
+                            .getFullPathName() +
+                        "/Downloads/" + downloadPath);
         if (!downloadResult.saveToFile(bin))
             downloadStatus = false;
         else
@@ -248,9 +271,9 @@ private:
         repaint();
     };
 
-    std::function<void(int64, int64, int64)> progress = [&](int64 downloaded, int64 total, int64)
-    {
-        downloadProgress = 100 * ((float)downloaded / (float)total);
-        repaint();
-    };
+    std::function<void(int64, int64, int64)> progress =
+        [&](int64 downloaded, int64 total, int64) {
+            downloadProgress = 100 * ((float)downloaded / (float)total);
+            repaint();
+        };
 };
