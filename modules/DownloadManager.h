@@ -1,6 +1,5 @@
 
 #pragma once
-#include "Config.h"
 #include <JuceHeader.h>
 
 #if JUCE_WINDOWS
