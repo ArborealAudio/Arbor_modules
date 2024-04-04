@@ -1,6 +1,5 @@
 
 #pragma once
-#include "Arbor_modules/modules/Config.h"
 #include <JuceHeader.h>
 
 #if JUCE_WINDOWS

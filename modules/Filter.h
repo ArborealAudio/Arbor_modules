@@ -62,13 +62,13 @@ struct Filter
 			a1 *= std::cosh(std::sqrt(q * q - 1.0) * w0);
 		a2 = tmp * tmp;
 
-		const auto f0 = cutoff / sampleRate;
+		const auto f0 = cutoff / (sampleRate * 0.5);
 		const auto freq2 = f0 * f0;
 		const auto fac = (1.0 - freq2) * (1.0 - freq2);
 
 		double r0, r1, r1_num, r1_denom;
-		if (type == lowpass)
-		{
+		switch (type) {
+		case lowpass:
 			r0 = 1.0 + a1 + a2;
 			r1_num = (1.0 - a1 + a2) * freq2;
 			r1_denom = std::sqrt(fac + freq2 / (reso*reso));
@@ -77,9 +77,8 @@ struct Filter
 			b0 = (r0 + r1) / 2.0;
 			b1 = r0 - b0;
 			b2 = 0.0;
-		}
-		else if (type == highpass)
-		{
+			break;
+		case highpass:
 			r1_num = 1.0 - a1 + a2;
 			r1_denom = std::sqrt(fac + freq2 / (reso*reso));
 			r1 = r1_num / r1_denom;
@@ -87,9 +86,8 @@ struct Filter
 			b0 = r1 / 4.0;
 			b1 = -2.0 * b0;
 			b2 = b0;
-		}
-		else if (type == bandpass)
-		{
+			break;
+		case bandpass:
 			r0 = (1.0 + a1 + a2) / (M_PI * f0 * reso);
 			r1_num = (1.0 - a1 + a2) * (f0 / reso);
 			r1_denom = std::sqrt(fac + (freq2 / (reso*reso)));
@@ -98,12 +96,20 @@ struct Filter
 			b1 = -r1 / 2.0;
 			b0 = (r0 - b1) / 2.0;
 			b2 = -b0 - b1;
+			break;
+			default: break;
 		}
 	}
 
 	void setCutoff(double newCutoff)
 	{
 		cutoff = newCutoff;
+		setCoeffs();
+	}
+
+	void setReso(double newReso)
+	{
+		reso = newReso;
 		setCoeffs();
 	}
 
