@@ -1,4 +1,4 @@
-/** Copyright 2022 Alex Riccio
+/** Copyright 2024 Alex Riccio
 
 Arbor_modules.h */
 
@@ -21,7 +21,6 @@ END_JUCE_MODULE_DECLARATION
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "xsimd/include/xsimd/xsimd.hpp"
-
 #include <clap-juce-extensions/clap-juce-extensions.h>
 
 using vec = xsimd::batch<double>;

@@ -1,6 +1,5 @@
 
 #pragma once
-#include "Config.h"
 #include <JuceHeader.h>
 
 #if JUCE_WINDOWS
@@ -24,8 +23,8 @@ struct UpdateResult
  * DownloadManager.h
  * What it sounds like. Depends on gin's DownloadManager
  * 
- * Expects a macro ARBOR_DEBUG_DOWNLOADER to be true, or else
- * for debug purposes will always return that an update
+ * You may define a macro ARBOR_DEBUG_DOWNLOADER, which for
+ * debug purposes will always return that an update
  * is available
 */
 struct DownloadManager : Component
@@ -122,14 +121,14 @@ struct DownloadManager : Component
             DBG("Latest: " << latestVersion.toString());
 
 #if ARBOR_DEBUG_DOWNLOADER
-            result.updateAvailable =
-                currentVersion.removeCharacters(".") <
-                latestVersion.toString().removeCharacters(".");
-#else
             DBG("Update result: "
                 << int(currentVersion.removeCharacters(".") <
                        latestVersion.toString().removeCharacters(".")));
             result.updateAvailable = true;
+#else
+            result.updateAvailable =
+                currentVersion.removeCharacters(".") <
+                latestVersion.toString().removeCharacters(".");
 #endif
             free(buf);
         }
