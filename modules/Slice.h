@@ -11,4 +11,4 @@ struct Slice {
 };
 
 // T = data, S = size
-#define to_slice(T, S) Slice{T, S}
+#define to_slice(T, S) Slice{(T), (S)}
