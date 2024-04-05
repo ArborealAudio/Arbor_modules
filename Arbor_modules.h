@@ -20,6 +20,9 @@ END_JUCE_MODULE_DECLARATION
 #include <juce_graphics/juce_graphics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "xsimd/include/xsimd/xsimd.hpp"
+#include <clap-juce-extensions/clap-juce-extensions.h>
+
 using vec = xsimd::batch<double>;
 
 namespace strix
