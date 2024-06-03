@@ -8,6 +8,7 @@
 
 #pragma once
 #include <JuceHeader.h>
+#include <stdio.h>
 
 struct LiteThread : Thread
 {
@@ -15,7 +16,9 @@ struct LiteThread : Thread
     LiteThread(int maxNumJobs) : Thread("LiteThread"), jobLimit(maxNumJobs)
     {
         DBG("Starting check thread...");
-        startThread(Thread::Priority::background);
+        bool ok = startThread(Thread::Priority::normal);
+        if (!ok)
+            fprintf(stderr, "Thread start failed\n");
     }
 
     ~LiteThread() override
