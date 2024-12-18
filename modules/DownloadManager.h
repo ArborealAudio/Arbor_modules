@@ -1,6 +1,7 @@
 
 #pragma once
 #include <JuceHeader.h>
+#include <quicfetch.h>
 
 #if JUCE_WINDOWS
     #define OS "windows"
@@ -10,45 +11,65 @@
     #define OS "linux"
 #endif
 
-static String downloadURL = "";
-
 /** struct to hold data about an update check */
-struct UpdateResult
+struct UpdateStatus
 {
     bool updateAvailable; // is an update avaiable?
     String changes = ""; // comma-separated list of changes
+    enum State {
+        Checking,
+        Finished
+    } state;
 };
+
+struct DownloadStatus
+{
+    // Did download succeed
+    bool ok;
+    // Percentage of total dl size
+    int progress;
+    // Size in bytes of download
+    size_t totalSize;
+    // State of manager. NotStarted, Downloading, Finished
+    enum State {
+        NotStarted,
+        Downloading,
+        Finished,
+    } state = NotStarted;
+};
+
+static void onUpdateCheck(Updater *updater, bool checkResult, void *user_data);
+static void downloadProgress(Updater *updater, size_t read, size_t total, void *user_data);
+static void downloadFinished(Updater *updater, bool ok, size_t size, void *user_data);
 
 /**
  * DownloadManager.h
- * What it sounds like. Depends on gin's DownloadManager
  * 
+ * Depends on abriccio/quicfetch (https://github.com/abriccio/quicfetch.git)
  * You may define a macro ARBOR_DEBUG_DOWNLOADER, which for
  * debug purposes will always return that an update
  * is available
 */
-struct DownloadManager : Component
+struct DownloadManager : Component, Timer
 {
     /**
     * @param _downloadPath location & filename to download to
     */
-    DownloadManager(const char *_downloadPath) : downloadPath(_downloadPath)
+    DownloadManager(const String &_downloadPath) : downloadPath(_downloadPath)
     {
         addAndMakeVisible(yes);
         addAndMakeVisible(no);
 
         no.onClick = [&]
         {
-            if (!isDownloading)
+            if (dlStatus.state != DownloadStatus::Downloading)
             {
                 setVisible(false);
-                shouldBeHidden = true;
             }
             else
             {
-                download.cancelAllDownloads();
-                isDownloading = false;
-                downloadFinished = false;
+                // download.cancelAllDownloads();
+                dlStatus.state = DownloadStatus::Finished;
                 no.setButtonText("No");
                 yes.setVisible(true);
                 yes.setButtonText("Yes");
@@ -56,102 +77,70 @@ struct DownloadManager : Component
             }
         };
         yes.onClick = [&]
-        { downloadFinished = false; downloadUpdate(); };
+        {
+            dlStatus.state = DownloadStatus::Downloading;
+            downloadUpdate();
+        };
+
+        startTimerHz(10);
     }
 
     ~DownloadManager() override
     {
         yes.setLookAndFeel(nullptr);
         no.setLookAndFeel(nullptr);
+        updater_deinit(updater);
+        stopTimer();
+    }
+
+    void timerCallback() override
+    {
+        if (needsRepaint) {
+            repaint();
+            needsRepaint = false;
+        }
     }
 
     /** @param force whether to force the check even if checked < 24hrs ago */
-    static UpdateResult checkForUpdate(const String pluginName,
-                                       const String &currentVersion,
-                                       const String &versionURL,
+    void checkForUpdate(const char *pluginName,
+                                       const char *currentVersion,
+                                       const char *versionURL,
                                        bool force = false, bool beta = false,
                                        int64 lastCheck = 0)
     {
-        UpdateResult result;
+        updateStatus.state = UpdateStatus::Checking;
+        updater = updater_init(versionURL, pluginName,
+                     currentVersion, this);
         if (!force)
         {
             auto dayAgo = Time::getCurrentTime() - RelativeTime::hours(24);
             if (lastCheck > dayAgo.toMilliseconds())
             {
-                result.updateAvailable = false;
-                return result;
+                updateStatus.updateAvailable = false;
+                updater_deinit(updater);
+                return;
             }
         }
 
-        auto stream = WebInputStream(URL(versionURL), false);
-        auto connected = stream.connect(nullptr);
-        auto size = stream.getTotalLength();
-        if (connected && !stream.isError() && size > 0)
-        {
-            char *buf = (char*)malloc(sizeof(char) * (size_t)size);
-            stream.read(buf, (int)size);
-            auto data = JSON::parse(String(CharPointer_UTF8(buf)));
-            auto pluginInfo = data.getProperty("plugins", var())
-                                  .getProperty(pluginName, var());
-            // if (beta)
-            // pluginInfo = pluginInfo.getProperty("beta", var());
-            auto changesObj = pluginInfo.getProperty("changes", var());
-            if (changesObj.isArray())
-            {
-                std::vector<String> chVec;
-                for (auto i = 0; i < changesObj.size(); ++i)
-                {
-                    chVec.emplace_back(changesObj[i].toString());
-                }
-
-                StringArray changesList{chVec.data(), (int)chVec.size()};
-                result.changes = changesList.joinIntoString(", ");
-            }
-            else
-            {
-                result.changes = changesObj;
-            }
-
-            auto latestVersion = pluginInfo.getProperty("version", var());
-            downloadURL = pluginInfo.getProperty("bin", var())
-                              .getProperty(OS, var())
-                              .toString();
-
-            DBG("Current: " << currentVersion);
-            DBG("Latest: " << latestVersion.toString());
-
-#if ARBOR_DEBUG_DOWNLOADER
-            DBG("Update result: "
-                << int(currentVersion.removeCharacters(".") <
-                       latestVersion.toString().removeCharacters(".")));
-            result.updateAvailable = true;
-#else
-            result.updateAvailable =
-                currentVersion.removeCharacters(".") <
-                latestVersion.toString().removeCharacters(".");
-#endif
-            free(buf);
-        }
-        else
-            result.updateAvailable = false;
-
-        return result;
+        updater_fetch(updater, onUpdateCheck);
     }
 
     void downloadUpdate()
     {
-        download.setDownloadBlockSize(64 * 128);
-        download.setProgressInterval(100);
-        download.setRetryDelay(1);
-        download.setRetryLimit(2);
-        download.startAsyncDownload(URL(downloadURL), result, progress);
-        isDownloading = true;
+        // download new binary
+        updater_download_bin(updater, DownloadOptions{
+                                 .progress = downloadProgress,
+                                 .finished = downloadFinished,
+                                 .dest_file = downloadPath.toRawUTF8(),
+                                 .chunk_size = 64 * 1024,
+                             });
         no.setButtonText("Cancel");
         yes.setVisible(false);
     }
 
     void paint(Graphics &g) override
     {
+        // NOTE: IS this really necessary? Why did I put this here?
         if (isVisible())
         {
             g.setColour(Colours::grey.darker());
@@ -162,42 +151,45 @@ struct DownloadManager : Component
             auto textbounds = Rectangle<int>{
                 getLocalBounds().reduced(10).withTrimmedBottom(70)};
 
-            if (!downloadFinished.load())
-            {
-                if (!isDownloading.load())
-                    g.drawFittedText("A new update is available! Would you "
-                                     "like to download?\n\nChanges:\n" +
-                                         changes,
+            if (dlStatus.state == DownloadStatus::NotStarted) {
+                if (updateStatus.updateAvailable) {
+                    g.drawFittedText("A new update is available!\n" +
+                                     String(updater_get_message(updater)),
                                      textbounds, Justification::centredTop, 10,
                                      0.f);
-                else
+                }
+            } else {
+                if (dlStatus.state == DownloadStatus::Downloading) {
                     g.drawFittedText("Downloading... " +
-                                         String(downloadProgress.load()) + "%",
+                                         String(dlStatus.progress) + "%",
                                      textbounds, Justification::centred, 1,
                                      1.f);
-            } else {
-                if (downloadStatus.load())
-                {
-                    g.drawFittedText("Download complete.\nThe installer is in "
-                                     "your Downloads folder. You must close "
-                                     "your DAW to run the installation.",
-                                     textbounds, Justification::centred, 7,
-                                     1.f);
-                    yes.setVisible(false);
-                    no.setButtonText("Close");
                 }
-                else
-                {
-                    g.drawFittedText("Download failed. Please try again.",
-                                     textbounds, Justification::centred,
-                                     7, 1.f);
-                    yes.setVisible(true);
-                    yes.setButtonText("Retry");
-                    yes.onClick = [this]
-                    { downloadProgress = 0;
-                    downloadFinished = false;
-                    isDownloading = true;
-                    downloadUpdate(); };
+                if (dlStatus.state == DownloadStatus::Finished) {
+                    if (dlStatus.ok) {
+                        g.drawFittedText("Download complete.\nThe installer is in "
+                                         "your Downloads folder. You must close "
+                                         "your DAW to run the installation.",
+                                         textbounds, Justification::centred, 7,
+                                         1.f);
+                        yes.setVisible(false);
+                        no.setButtonText("Close");
+                    }
+                    else {
+                        g.drawFittedText("Download failed\n" +
+                                         String(updater_get_message(updater)),
+                                         textbounds, Justification::centred,
+                                         7, 1.f);
+                        yes.setVisible(true);
+                        yes.setButtonText("Retry");
+                        yes.onClick = [this]
+                        {
+                            dlStatus = DownloadStatus{
+                                .state = DownloadStatus::Downloading
+                            };
+                            downloadUpdate();
+                        };
+                    }
                 }
             }
         }
@@ -225,54 +217,49 @@ struct DownloadManager : Component
 
     const String url, downloadPath;
 
-    String changes;
+    UpdateStatus updateStatus;
+    DownloadStatus dlStatus;
 
-    bool shouldBeHidden = false; // set to true when "No" is clicked
+    std::atomic<bool> needsRepaint = false;
+
+   // bool shouldBeHidden = false; // set to true when "No" is clicked
 
 private:
-
-    void onUpdateCheck(bool checkResult)
-    {
-        if (isVisible() != checkResult)
-            setVisible(checkResult);
-    }
-
-    gin::DownloadManager download;
+    Updater *updater;
 
     TextButton yes{"Yes"}, no{"No"};
-
-    std::atomic<bool> downloadStatus = false;
-    std::atomic<bool> isDownloading = false;
-    std::atomic<int> downloadProgress = 0;
-    std::atomic<bool> downloadFinished = false;
-
-    std::function<void(gin::DownloadManager::DownloadResult)> result =
-        [&](gin::DownloadManager::DownloadResult downloadResult)
-    {
-        downloadStatus = downloadResult.ok;
-        isDownloading = false;
-
-        if (!downloadResult.ok || downloadResult.httpCode != 200)
-        {
-            downloadFinished = true;
-            repaint();
-            return;
-        }
-
-        auto bin = File(File::getSpecialLocation(File::userHomeDirectory)
-                            .getFullPathName() +
-                        "/Downloads/" + downloadPath);
-        if (!downloadResult.saveToFile(bin))
-            downloadStatus = false;
-        else
-            downloadFinished = true;
-
-        repaint();
-    };
-
-    std::function<void(int64, int64, int64)> progress =
-        [&](int64 downloaded, int64 total, int64) {
-            downloadProgress = 100 * ((float)downloaded / (float)total);
-            repaint();
-        };
 };
+
+static void downloadFinished(Updater *updater, bool ok, size_t size, void *user_data)
+{
+    DownloadManager *dl = (DownloadManager*)user_data;
+    dl->dlStatus.ok = ok;
+    dl->dlStatus.state = DownloadStatus::Finished;
+    dl->dlStatus.totalSize = size;
+    
+    dl->needsRepaint = true;
+};
+
+static void downloadProgress(Updater *updater, size_t read, size_t total, void *user_data)
+{
+    DownloadManager *dl = (DownloadManager*)user_data;
+    dl->dlStatus.progress = ((float)read / (float)total) * 100.f;
+    dl->needsRepaint = true;
+};
+
+static void onUpdateCheck(Updater *updater, bool checkResult, void *user_data)
+{
+    DownloadManager *dl = (DownloadManager*)user_data;
+    dl->updateStatus.updateAvailable = checkResult;
+    dl->updateStatus.changes.fromUTF8(updater_get_message(updater));
+    dl->updateStatus.state = UpdateStatus::Finished;
+
+    if (checkResult) {
+        DBG("Update available");
+        dl->setVisible(true);
+    } else {
+        DBG("No update");
+        dl->setVisible(false);
+    }
+    dl->needsRepaint = true;
+}
