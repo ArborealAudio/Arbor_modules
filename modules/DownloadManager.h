@@ -121,14 +121,19 @@ struct DownloadManager : Component, Timer
         if (!force)
         {
             auto dayAgo = Time::getCurrentTime() - RelativeTime::hours(24);
+            DBG("Last check: " << lastCheck);
+            DBG("24hr ago: " << dayAgo.toMilliseconds());
             if (lastCheck > dayAgo.toMilliseconds())
             {
+                DBG("Checked within 24 hours");
+                updateStatus.state = UpdateStatus::Finished;
                 updateStatus.updateAvailable = false;
                 updater_deinit(updater);
                 return;
             }
         }
 
+        DBG("Checking for update");
         updater_fetch(updater, onUpdateCheck);
     }
 
