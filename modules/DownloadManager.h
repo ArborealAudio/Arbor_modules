@@ -89,7 +89,10 @@ struct DownloadManager : Component, Timer
     {
         yes.setLookAndFeel(nullptr);
         no.setLookAndFeel(nullptr);
-        updater_deinit(updater);
+        if (updater) {
+            updater_deinit(updater);
+            updater = nullptr;
+        }
         stopTimer();
     }
 
@@ -111,6 +114,10 @@ struct DownloadManager : Component, Timer
         updateStatus.state = UpdateStatus::Checking;
         updater = updater_init(versionURL, pluginName,
                      currentVersion, this);
+        if (!updater) {
+            DBG("Updater is null\n");
+            return;
+        }
         if (!force)
         {
             auto dayAgo = Time::getCurrentTime() - RelativeTime::hours(24);
@@ -128,12 +135,16 @@ struct DownloadManager : Component, Timer
     void downloadUpdate()
     {
         // download new binary
-        updater_download_bin(updater, DownloadOptions{
-                                 .progress = downloadProgress,
-                                 .finished = downloadFinished,
-                                 .dest_file = downloadPath.toRawUTF8(),
-                                 .chunk_size = 64 * 1024,
-                             });
+        if (updater) {
+            updater_download_bin(updater, DownloadOptions{
+                                     .progress = downloadProgress,
+                                     .finished = downloadFinished,
+                                     .dest_file = downloadPath.toRawUTF8(),
+                                     .chunk_size = 64 * 1024,
+                                 });
+        } else {
+            DBG("Updater is null\n");
+        }
         no.setButtonText("Cancel");
         yes.setVisible(false);
     }
@@ -151,6 +162,10 @@ struct DownloadManager : Component, Timer
             auto textbounds = Rectangle<int>{
                 getLocalBounds().reduced(10).withTrimmedBottom(70)};
 
+            if (!updater) {
+                DBG("Updater is null\n");
+                return;
+            }
             if (dlStatus.state == DownloadStatus::NotStarted) {
                 if (updateStatus.updateAvailable) {
                     g.drawFittedText("A new update is available!\n" +
@@ -225,7 +240,7 @@ struct DownloadManager : Component, Timer
    // bool shouldBeHidden = false; // set to true when "No" is clicked
 
 private:
-    Updater *updater;
+    Updater *updater = nullptr;
 
     TextButton yes{"Yes"}, no{"No"};
 };
@@ -251,7 +266,12 @@ static void onUpdateCheck(Updater *updater, bool checkResult, void *user_data)
 {
     DownloadManager *dl = (DownloadManager*)user_data;
     dl->updateStatus.updateAvailable = checkResult;
-    dl->updateStatus.changes.fromUTF8(updater_get_message(updater));
+    if (updater) {
+        dl->updateStatus.changes.fromUTF8(updater_get_message(updater));
+    } else {
+        DBG("Updater is null\n");
+        dl->updateStatus.changes = "Updater is null";
+    }
     dl->updateStatus.state = UpdateStatus::Finished;
 
     if (checkResult) {
